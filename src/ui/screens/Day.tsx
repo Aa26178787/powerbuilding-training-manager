@@ -1,8 +1,9 @@
 // 오늘 루틴: 운동마다 세트 표(# · 이전 · kg · 회 · RPE · ✓)로 기록한다.
 // 레퍼런스: Strong/Hevy의 세트 줄 + 체크, 지난 기록 열, 체크 후 휴식 타이머 자동 시작.
 import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { m } from 'motion/react';
-import { Check, ChevronLeft, ChevronRight, Ellipsis, Flag, Minus, Play, Plus, SkipForward, Timer, Undo2 } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Ellipsis, Flag, Minus, Play, Plus, SkipForward, Timer, Undo2, X } from 'lucide-react';
 import type { Db, ISODate, IssueFlag, PerformedSet, PlannedSet, Side } from '../../domain/types';
 import { addDays, fmtDateKo, weekdayOf } from '../../engine/dates';
 import { plateBreakdown } from '../../engine/rounding';
@@ -16,7 +17,7 @@ import {
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
 import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
-import { Badge, Btn, Chip, cx, Empty, fmtKg, PlateChips, RpeChips, RpePicker, Sheet, Stepper } from '../components';
+import { Badge, Btn, Chip, cx, Empty, fmtKg, PLATE_COLOR, RpePicker, Sheet, Stepper } from '../components';
 
 const FLAG_KO: Record<IssueFlag, string> = {
   equipment_failure: '장비 문제', grip_slip: '그립 미끄러짐', j_cup_collision: 'J컵 충돌', unusual_shoes: '평소와 다른 신발',
@@ -124,19 +125,6 @@ const RecordSheet = ({ t, onClose }: { t: EditTarget; onClose: () => void }) => 
 };
 
 /* ---------- 세트 표 공통 ---------- */
-const CELL = 'num-d flex h-[42px] items-center justify-center text-[17px]';
-const inputCls = 'field num-d h-[42px] min-h-0 px-0.5 text-center text-[17px]';
-
-/** 체크 버튼: 완료 전에는 노랑, 완료면 초록 채움 + 짧은 등장 */
-const CheckCell = ({ done, onClick, disabled, label, fresh }: { done: boolean; onClick?: () => void; disabled?: boolean; label: string; fresh?: boolean }) => (
-  done ? (
-    <span className={cx('flex h-[40px] items-center justify-center rounded-md bg-p10 text-[#0d1f14]', fresh && 'check-pop')} aria-label={`${label} 완료`}><Check size={20} strokeWidth={3} /></span>
-  ) : (
-    <button type="button" className="press flex h-[42px] items-center justify-center rounded-md bg-p15 text-[#1b1608] disabled:bg-steel disabled:text-knurl" onClick={onClick} disabled={disabled} aria-label={`${label} 완료`}>
-      <Check size={20} strokeWidth={3} />
-    </button>
-  )
-);
 
 /** 처방·추천 안내 한 줄. 감량 권고면 왼쪽 빨강 띠 */
 const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop: () => void; openCount: number; disabled: boolean }) => {
@@ -163,31 +151,106 @@ const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop:
   );
 };
 
-/** 세트 진행 막대: 세트마다 한 칸. 완료는 초록, 건너뜀은 회색으로 채운다 */
-const SetBar = ({ sets }: { sets: PlannedSet[] }) => (
-  <div className="mt-2.5 flex gap-1" aria-hidden>
-    {sets.map((s) => (
-      <span key={s.id} className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-rail">
-        <m.span className={cx('absolute inset-0 origin-left rounded-full', s.status === 'done' ? 'bg-p10' : 'bg-knurl')} initial={false}
-          animate={{ scaleX: s.status === 'planned' ? 0 : 1 }} transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }} />
-      </span>
-    ))}
+const Tag = ({ children }: { children: ReactNode }) => <span className="inline-flex h-6 items-center rounded-md border border-rail px-2 text-[11.5px] text-dust">{children}</span>;
+
+/** 원판 지름(mm)·두께 비율로 그린 크기 [폭, 높이] px. 25·20kg 지름 450mm를 88px로 */
+const PLATE_DIM: Record<string, [number, number]> = { 25: [11, 88], 20: [10, 88], 15: [9, 78], 10: [8, 64], 5: [6, 45], 2.5: [5, 37], 1.25: [4, 31] };
+
+/** 바벨 옆모습: 가운데 봉, 칼라, 슬리브. 원판은 칼라에 붙여 큰 것부터 바깥으로 */
+const BarDiagram = ({ perSide }: { perSide: number[] }) => {
+  const plates = perSide.map((kg, i) => ({ kg, i, w: PLATE_DIM[String(kg)]?.[0] ?? 4, h: PLATE_DIM[String(kg)]?.[1] ?? 26 }));
+  const side = (dir: 'L' | 'R') => (
+    <div className="relative h-full min-w-[64px] flex-1" style={{ maxWidth: 112 }}>
+      <div className="absolute inset-x-0 top-1/2 h-[10px] -translate-y-1/2 rounded-sm bg-[#8a8f98]" />
+      <div className={cx('absolute inset-y-0 flex items-center gap-[2px]', dir === 'L' ? 'right-0 flex-row-reverse' : 'left-0')}>
+        {plates.map((p) => (
+          <m.span key={`${p.i}-${p.kg}`} className="block rounded-[3px]" initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+            style={{ width: p.w, height: p.h, background: PLATE_COLOR[String(p.kg)] ?? '#6b7280', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14)' }} />
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <div aria-hidden className="flex h-[92px] items-center">
+      {side('L')}
+      <div className="h-5 w-2 shrink-0 rounded-sm bg-[#a3a8b0]" />
+      <div className="h-1 flex-[1.3] bg-[#6b7079]" />
+      <div className="h-5 w-2 shrink-0 rounded-sm bg-[#a3a8b0]" />
+      {side('R')}
+    </div>
+  );
+};
+
+const RPES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+/** RPE 9칸. 선택은 흰색, 목표 범위는 밑줄, 상한 초과 선택은 빨강 */
+const RpeCells = ({ value, onChange, lo, hi, cap, disabled }: { value: number | null; onChange: (v: number | null) => void; lo?: number; hi?: number; cap?: number; disabled?: boolean }) => (
+  <div role="radiogroup" aria-label="실제 RPE" className="grid grid-cols-9 gap-1">
+    {RPES.map((r) => {
+      const sel = value === r;
+      const inTarget = lo !== undefined && r >= lo && r <= (hi ?? lo);
+      return (
+        <button key={r} type="button" role="radio" aria-checked={sel} disabled={disabled} onClick={() => onChange(sel ? null : r)}
+          className={cx('press num-d h-11 rounded-lg text-[17px]', sel ? (cap !== undefined && r > cap ? 'bg-p25 font-bold text-white' : 'bg-chalk font-bold text-iron') : inTarget ? 'bg-iron text-chalk shadow-[inset_0_-2px_0_var(--color-chalk)]' : 'bg-iron text-dust')}>{r}</button>
+      );
+    })}
   </div>
 );
 
-const Tag = ({ children }: { children: ReactNode }) => <span className="inline-flex h-6 items-center rounded-md border border-rail px-2 text-[11.5px] text-dust">{children}</span>;
-
-const UndoSkip = ({ label, onClick }: { label: string; onClick: () => void }) => (
-  <button type="button" className="press flex h-[40px] flex-col items-center justify-center rounded-md bg-deck text-[10px] leading-none text-dust" aria-label={`${label} 되돌리기`} onClick={(e) => { e.stopPropagation(); onClick(); }}>
-    <Undo2 size={14} aria-hidden /><span className="mt-0.5">{label}</span>
-  </button>
+/** 큰 숫자 입력 + 양옆 −/+ */
+const BigNumber = ({ value, onChange, onStep, step, unit, label, size = 'lg', disabled }: {
+  value: string; onChange: (v: string) => void; onStep: (d: number) => void; step: number; unit: string; label: string; size?: 'lg' | 'md'; disabled?: boolean;
+}) => (
+  <div className="flex items-center gap-2.5">
+    <button type="button" className={cx('press flex shrink-0 items-center justify-center rounded-xl', size === 'lg' ? 'h-12 w-12 border border-rail' : 'h-10 w-10 text-dust')} disabled={disabled} onClick={() => onStep(-step)} aria-label={`${label} ${step} 줄이기`}><Minus size={18} aria-hidden /></button>
+    <label className="flex min-w-0 flex-1 items-baseline justify-center gap-1">
+      <input className={cx('num-d w-full min-w-0 bg-transparent text-center font-bold outline-none focus-visible:rounded-lg focus-visible:bg-iron', size === 'lg' ? 'h-16 text-[60px] leading-none tracking-[-0.01em] placeholder:text-knurl' : 'h-10 text-[32px] leading-none')}
+        type="number" inputMode="decimal" step="any" aria-label={label} placeholder="0" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} onFocus={(e) => e.target.select()} style={{ maxWidth: size === 'lg' ? 200 : 72 }} />
+      <span className={cx('shrink-0 text-dust', size === 'lg' ? 'text-[16px]' : 'text-[14px]')}>{unit}</span>
+    </label>
+    <button type="button" className={cx('press flex shrink-0 items-center justify-center rounded-xl', size === 'lg' ? 'h-12 w-12 border border-rail' : 'h-10 w-10 text-dust')} disabled={disabled} onClick={() => onStep(step)} aria-label={`${label} ${step} 늘리기`}><Plus size={18} aria-hidden /></button>
+  </div>
 );
 
-const PendingCheck = () => <span className="flex h-[40px] items-center justify-center rounded-md border border-rail text-knurl" aria-label="대기"><Check size={16} /></span>;
+/** 화면 아래 고정 주 버튼. 탭 막대 바로 위에 붙는다 */
+const ActionBar = ({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: ReactNode }) => {
+  useEffect(() => { document.body.dataset.action = '1'; return () => { delete document.body.dataset.action; }; }, []);
+  return createPortal(
+    <div className="action-pos fixed inset-x-0 z-20 border-t border-rail bg-iron/95 px-4 py-2.5 backdrop-blur">
+      <button type="button" className="press mx-auto flex h-14 w-full max-w-[496px] items-center justify-center gap-2.5 rounded-[14px] bg-chalk text-[16px] font-bold text-iron" onClick={onClick} disabled={disabled}>{children}</button>
+    </div>,
+    document.body,
+  );
+};
 
-/** 파워빌딩 세트 표 */
-const PbTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
-  db: Db; g: DayGroupView; date: ISODate; focused: boolean; disabled: boolean; onEdit: (t: EditTarget) => void; onFocus: () => void;
+/** 세트 줄: 세트마다 한 칸, 위쪽 2px 선(끝남 흰색, 남음 회색). 끝난 칸을 누르면 수정 */
+const SetStrip = ({ g, date, activeId, onEdit, labelOf, valueOf }: {
+  g: DayGroupView; date: ISODate; activeId?: string; onEdit: (t: EditTarget) => void; labelOf: (s: PlannedSet, i: number) => string; valueOf: (perf: PerformedSet[]) => string;
+}) => (
+  <ol className="mt-3.5 grid grid-cols-4 gap-x-1.5 gap-y-2.5">
+    {g.sets.map((s, i) => {
+      const perf = g.performed[s.id] ?? [];
+      const done = s.status === 'done';
+      const now = s.id === activeId;
+      const skipped = s.status !== 'done' && s.status !== 'planned';
+      return (
+        <m.li layout="position" transition={LAYOUT} key={s.id} className={cx('min-w-0 border-t-2 pt-1.5', done ? 'border-chalk' : now ? 'border-chalk/40' : 'border-rail', done && justDone.has(s.id) && 'row-done')}>
+          <div className={cx('text-[11px] leading-4', now ? 'font-semibold text-chalk' : 'text-dust')}>{labelOf(s, i)}{now ? ' 지금' : ''}</div>
+          {done && perf.length ? (
+            <button type="button" className="num-d block w-full truncate text-left text-[16px] leading-6" onClick={() => onEdit({ perf: perf[0], group: g, date })} aria-label={`${labelOf(s, i)} ${perfText(perf[0])} 수정`}>{valueOf(perf)}</button>
+          ) : skipped ? (
+            <button type="button" className="press flex h-6 items-center gap-1 text-[12px] text-dust" onClick={() => void run((d) => unskipSet(d, s.id))} aria-label={`${labelOf(s, i)} 건너뜀 되돌리기`}><Undo2 size={13} aria-hidden />{s.status === 'skipped_by_autoregulation' ? '조기 종료' : '건너뜀'}</button>
+          ) : (
+            <div className="num-d truncate text-[16px] leading-6 text-knurl">×{targetReps(s)}{targetRpe(s) ? ` @${targetRpe(s)}` : ''}</div>
+          )}
+        </m.li>
+      );
+    })}
+  </ol>
+);
+
+/** 파워빌딩 운동 입력 구역 */
+const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
+  db: Db; g: DayGroupView; date: ISODate; focused: boolean; disabled: boolean; onEdit: (t: EditTarget) => void;
 }) => {
   const active = g.sets.find((s) => s.status === 'planned');
   const sug = useMemo(() => (active ? suggestForSet(db, active, date) : null), [db, active, date]);
@@ -210,10 +273,11 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, sug?.load]);
   const w = weight === '' ? null : Number(weight);
-  const plates = g.exercise.barbell && w !== null && w > 0 ? plateBreakdown(w, db.settings.barWeight, db.settings.plates) : null;
+  const plates = g.exercise.barbell && w !== null && w > 0 ? plateBreakdown(w, db.settings.barWeight, db.settings.plates, db.settings.plateStock) : null;
   const warm = g.exercise.barbell && w !== null && doneHere.length === 0 ? warmupPlan(w, db.settings.barWeight, inc) : [];
   const open = g.sets.filter((s) => s.status === 'planned');
-  const bump = (d: number) => setWeight(String(Math.max(0, Math.round(((Number(weight) || 0) + d) * 1000) / 1000)));
+  const bumpW = (d: number) => setWeight(String(Math.max(0, Math.round(((Number(weight) || 0) + d) * 1000) / 1000)));
+  const bumpR = (d: number) => setReps(String(Math.max(0, (Number(reps) || 0) + d)));
 
   const complete = async () => {
     if (!active || busy) return;
@@ -234,83 +298,53 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
     const r = await run((d, ctx) => skipSets(d, open.map((s) => s.id), true, '사용자 승인 조기 종료', ctx));
     if (r.ok) toast(`남은 ${open.length}세트를 조기 종료로 기록했습니다`);
   };
-  const label = (s: PlannedSet) => (s.type === 'top' ? 'T' : String(g.sets.filter((x) => x.type === s.type).indexOf(s) + 1));
-  const COLS = 'grid grid-cols-[1.6rem_minmax(0,1fr)_4.4rem_2.6rem_2.6rem_2.75rem] items-center gap-1.5';
+  const labelOf = (s: PlannedSet) => (s.type === 'top' ? 'Top' : `${g.sets.filter((x) => x.type === s.type).indexOf(s) + 1}세트`);
+  const unit = active?.seconds ? '초' : '회';
 
   return (
     <div>
-      {focused && sug && sug.kind !== 'none' && <Advice sug={sug} onStop={stopRest} openCount={open.length} disabled={disabled} />}
-      {focused && sug?.kind === 'none' && sug.message && <div className="mt-1.5 text-[12px] text-dust">{sug.message}</div>}
-      {focused && active && <div className={cx(COLS, 'mt-2 text-[11px] text-dust')}><span className="text-center">세트</span><span>이전</span><span className="text-center">kg</span><span className="text-center">회</span><span className="text-center">RPE</span><span /></div>}
-      <ul className="mt-1 space-y-1">
-        {g.sets.map((s) => {
-          const perf = g.performed[s.id] ?? [];
-          const pv = prevFor(s);
-          if (s.id === active?.id && focused) {
-            return (
-              <m.li layout="position" transition={LAYOUT} key={s.id} className="rounded-lg bg-deck p-1.5">
-                <div className={COLS}>
-                  <span className="num-d text-center text-[15px] text-p15">{label(s)}</span>
-                  <span className="num-d truncate text-[14px] text-dust">{pv ? short(pv) : '—'}</span>
-                  <input className={inputCls} type="number" inputMode="decimal" step="any" aria-label={`${g.instance.exerciseName} ${label(s)}세트 중량`} value={weight} disabled={disabled} onChange={(e) => setWeight(e.target.value)} onFocus={(e) => e.target.select()} />
-                  <input className={inputCls} type="number" inputMode="numeric" aria-label={`${label(s)}세트 ${s.seconds ? '유지 시간' : '반복수'}`} placeholder={targetReps(s)} value={reps} disabled={disabled} onChange={(e) => setReps(e.target.value)} onFocus={(e) => e.target.select()} />
-                  <span className={cx(CELL, rpe !== null && rpe > s.rpeCap ? 'text-p25' : rpe === null ? 'text-knurl' : '')}>{rpe ?? (targetRpe(s) || '—')}</span>
-                  <CheckCell done={false} onClick={complete} disabled={disabled || busy || reps === '' || weight === ''} label={`${label(s)}세트`} />
-                </div>
-                <div className="mt-1.5"><RpeChips value={rpe} onChange={setRpe} cap={s.rpeCap} disabled={disabled} /></div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <button type="button" className="press flex h-9 w-10 items-center justify-center rounded-md bg-steel text-dust" onClick={() => bump(-inc)} disabled={disabled} aria-label={`중량 ${inc}kg 줄이기`}><Minus size={16} /></button>
-                  <button type="button" className="press flex h-9 w-10 items-center justify-center rounded-md bg-steel text-dust" onClick={() => bump(inc)} disabled={disabled} aria-label={`중량 ${inc}kg 늘리기`}><Plus size={16} /></button>
-                  <div className="min-w-0 flex-1">{plates && <PlateChips perSide={plates.perSide} remainder={plates.remainder} />}</div>
-                  <button type="button" className={cx('press flex h-9 items-center gap-1 rounded-md px-2 text-[12px]', flags.length ? 'bg-p25/25 text-chalk' : 'bg-steel text-dust')} onClick={() => setShowFlags(!showFlags)} aria-expanded={showFlags}>
-                    <Flag size={14} />{flags.length ? flags.length : '태그'}
-                  </button>
-                </div>
-                {showFlags && <div className="mt-1.5"><FlagPicker flags={flags} onChange={setFlags} /></div>}
-                {warm.length > 1 && <div className="num mt-1.5 text-[11px] text-dust">워밍업 {warm.map((x) => `${fmtKg(x.load)}×${x.reps}`).join(' → ')}</div>}
-                {rpe !== null && rpe > s.rpeCap && <div className="mt-1 text-[12px] text-p25">상한 @{s.rpeCap}을 넘습니다. 기록은 그대로 저장되고 다음 세트는 감량을 제안합니다.</div>}
-              </m.li>
-            );
-          }
-          const tappable = s.status === 'planned' && !focused;
-          return (
-            <m.li layout="position" transition={LAYOUT} key={s.id} className={cx(COLS, 'min-h-[40px] rounded-md', s.status === 'done' && justDone.has(s.id) && 'row-done', s.status === 'done' && 'bg-p10/[0.07]')}
-              onClick={tappable ? onFocus : undefined} role={tappable ? 'button' : undefined}>
-              <span className={cx('num-d text-center text-[15px]', s.type === 'top' ? 'text-p15' : 'text-dust')}>{label(s)}</span>
-              <span className="num-d truncate text-[14px] text-dust">{pv ? short(pv) : '—'}</span>
-              {perf.length ? (
-                <button type="button" className="col-span-3 grid h-[40px] grid-cols-[4.4rem_2.6rem_2.6rem] items-center gap-1.5" onClick={() => onEdit({ perf: perf[0], group: g, date })} aria-label={`${perfText(perf[0])} 수정`}>
-                  <span className="num-d text-center text-[17px]">{fmtKg(perf[0].weight)}</span>
-                  <span className="num-d text-center text-[17px]">{repsOf(perf[0])}</span>
-                  <span className={cx('num-d text-center text-[17px]', perf[0].rpe !== undefined && perf[0].rpe > s.rpeCap && 'text-p25')}>{perf[0].rpe ?? '—'}</span>
-                </button>
-              ) : (
-                <>
-                  <span className="num-d text-center text-[15px] text-knurl">—</span>
-                  <span className="num-d text-center text-[15px] text-knurl">{targetReps(s)}</span>
-                  <span className="num-d text-center text-[15px] text-knurl">{targetRpe(s)}</span>
-                </>
-              )}
-              {s.status === 'done' ? <CheckCell done fresh={justDone.has(s.id)} label={label(s)} />
-                : s.status === 'planned' ? <PendingCheck />
-                : <UndoSkip label={s.status === 'skipped_by_autoregulation' ? '조기종료' : '건너뜀'} onClick={() => void run((d) => unskipSet(d, s.id))} />}
-            </m.li>
-          );
-        })}
-      </ul>
       {focused && active && (
-        <div className="mt-1 flex justify-end">
-          <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}><SkipForward size={14} aria-hidden />이 세트 건너뛰기</Chip>
+        <div className="mt-3">
+          {plates && (
+            <>
+              <BarDiagram perSide={plates.perSide} />
+              <div className="mt-1 text-center text-[12px] text-dust">
+                한쪽 <span className="num-d text-[14px] text-chalk/80">{plates.perSide.join(' ') || '빈 바'}</span>
+                {plates.remainder > 0 && <span className="text-p25">, 가진 원판으로 {plates.remainder}kg 모자람</span>}
+              </div>
+            </>
+          )}
+          {g.exercise.loadMode === 'bodyweight_plus' && <div className="text-center text-[12px] text-dust">추가 중량(벨트에 다는 무게)</div>}
+          <div className="mt-2.5"><BigNumber value={weight} onChange={setWeight} onStep={bumpW} step={inc} unit="kg" label={`${labelOf(active)} 중량`} disabled={disabled} /></div>
+          <div className="mx-auto mt-1 max-w-[220px]"><BigNumber value={reps} onChange={setReps} onStep={bumpR} step={1} unit={unit} label={`${labelOf(active)} ${active.seconds ? '유지 시간' : '반복수'}`} size="md" disabled={disabled} /></div>
+          <div className="mt-3"><RpeCells value={rpe} onChange={setRpe} lo={active.targetRpe} hi={active.targetRpeMax} cap={active.rpeCap} disabled={disabled} /></div>
+          {rpe !== null && rpe > active.rpeCap
+            ? <p className="mt-1.5 text-[12px] leading-[1.45] text-p25">상한 @{active.rpeCap}을 넘습니다. 기록은 그대로 남고 다음 세트는 감량을 제안합니다.</p>
+            : <p className="mt-1.5 text-[11px] text-dust">밑줄은 목표 RPE {targetRpe(active)}</p>}
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <Chip className={cx(flags.length > 0 && '!bg-p25/25')} onClick={() => setShowFlags(!showFlags)} aria-expanded={showFlags}><Flag size={13} aria-hidden />{flags.length ? `태그 ${flags.length}` : '태그'}</Chip>
+            <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}><SkipForward size={13} aria-hidden />이 세트 건너뛰기</Chip>
+          </div>
+          {showFlags && <div className="mt-2"><FlagPicker flags={flags} onChange={setFlags} /></div>}
+          {warm.length > 1 && <div className="num mt-2.5 text-[12px] text-dust">워밍업 <span className="num-d text-[14px] text-chalk/80">{warm.map((x) => `${fmtKg(x.load)}×${x.reps}`).join(', ')}</span></div>}
         </div>
       )}
-      {g.extras.length > 0 && <div className="num mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-dust"><span>계획 외 세트</span>{g.extras.map((p) => <Chip key={p.id} onClick={() => onEdit({ perf: p, group: g, date })}>{short(p)}</Chip>)}</div>}
+      <SetStrip g={g} date={date} activeId={focused ? active?.id : undefined} onEdit={onEdit} labelOf={labelOf} valueOf={(perf) => short(perf[0])} />
+      {focused && sug && sug.kind !== 'none' && <Advice sug={sug} onStop={stopRest} openCount={open.length} disabled={disabled} />}
+      {focused && sug?.kind === 'none' && sug.message && <p className="mt-2.5 text-[12.5px] leading-[1.45] text-dust">{sug.message}</p>}
+      {g.extras.length > 0 && <div className="num mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-dust"><span>계획 외 세트</span>{g.extras.map((p) => <Chip key={p.id} onClick={() => onEdit({ perf: p, group: g, date })}>{short(p)}</Chip>)}</div>}
+      {focused && active && (
+        <ActionBar onClick={complete} disabled={disabled || busy || reps === '' || (weight === '' && g.exercise.loadMode !== 'bodyweight_plus')}>
+          {weight === '' && g.exercise.loadMode !== 'bodyweight_plus' ? '중량을 넣으세요' : <>{labelOf(active)} 기록 <span className="num-d text-[19px] font-semibold">{weight === '' ? '' : `${fmtKg(w)}kg × `}{reps || '?'}{unit === '초' ? '초' : ''}{rpe !== null ? ` @${rpe}` : ''}</span></>}
+        </ActionBar>
+      )}
     </div>
   );
 };
 
-/** ARM 세트 표: 한 줄에 왼팔·오른팔 kg을 함께 넣고 체크 */
-const ArmTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
-  db: Db; g: DayGroupView; date: ISODate; focused: boolean; disabled: boolean; onEdit: (t: EditTarget) => void; onFocus: () => void;
+/** ARM 입력 구역: 왼팔·오른팔 중량을 함께 넣는다 */
+const ArmTable = ({ db, g, date, focused, disabled, onEdit }: {
+  db: Db; g: DayGroupView; date: ISODate; focused: boolean; disabled: boolean; onEdit: (t: EditTarget) => void;
 }) => {
   const separate = db.settings.armSideMode === 'separate';
   const history = lastSessionSets(db, g.exercise.id, date, armVariantKey(db, g.instance.id));
@@ -342,64 +376,36 @@ const ArmTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
     }
   };
   const open = g.sets.filter((s) => s.status === 'planned');
-  const COLS = separate ? 'grid grid-cols-[1.6rem_minmax(0,1fr)_minmax(0,1fr)_2.6rem_2.6rem_2.75rem] items-center gap-1.5' : 'grid grid-cols-[1.6rem_minmax(0,1fr)_2.6rem_2.6rem_2.75rem] items-center gap-1.5';
+  const labelOf = (_s: PlannedSet, i: number) => `${i + 1}세트`;
+  const idx = active ? g.sets.indexOf(active) : -1;
+  const kgField = (label: string, value: string, set: (v: string) => void) => (
+    <label className="min-w-0 flex-1 text-center">
+      <span className="block text-[11px] text-dust">{label}</span>
+      <span className="flex items-baseline justify-center gap-1">
+        <input className="num-d h-12 w-full min-w-0 rounded-lg bg-iron text-center text-[32px] font-bold leading-none outline-none placeholder:text-knurl" placeholder="0" type="number" inputMode="decimal" step="any" aria-label={`${label} 중량`} value={value} disabled={disabled} onChange={(e) => set(e.target.value)} onFocus={(e) => e.target.select()} />
+        <span className="shrink-0 text-[13px] text-dust">kg</span>
+      </span>
+    </label>
+  );
   return (
     <div>
-      {focused && active && <div className={cx(COLS, 'mt-2 text-[11px] text-dust')}><span className="text-center">세트</span><span className="text-center">{separate ? '왼팔 kg' : 'kg'}</span>{separate && <span className="text-center">오른팔 kg</span>}<span className="text-center">{isStatic ? '초' : '회'}</span><span className="text-center">RPE</span><span /></div>}
-      <ul className="mt-1 space-y-1">
-        {g.sets.map((s, i) => {
-          const perf = g.performed[s.id] ?? [];
-          if (s.id === active?.id && focused) {
-            return (
-              <m.li layout="position" transition={LAYOUT} key={s.id} className="rounded-lg bg-deck p-1.5">
-                <div className={COLS}>
-                  <span className="num-d text-center text-[15px] text-p10">{i + 1}</span>
-                  <input className={inputCls} type="number" inputMode="decimal" step="any" aria-label={`세트 ${i + 1} ${separate ? '왼팔' : ''} 중량`} value={left} disabled={disabled} onChange={(e) => setLeft(e.target.value)} onFocus={(e) => e.target.select()} />
-                  {separate && <input className={inputCls} type="number" inputMode="decimal" step="any" aria-label={`세트 ${i + 1} 오른팔 중량`} value={right} disabled={disabled} onChange={(e) => setRight(e.target.value)} onFocus={(e) => e.target.select()} />}
-                  <input className={inputCls} type="number" inputMode="numeric" aria-label={`세트 ${i + 1} ${isStatic ? '유지 시간' : '반복수'}`} value={reps} disabled={disabled} onChange={(e) => setReps(e.target.value)} onFocus={(e) => e.target.select()} />
-                  <span className={cx(CELL, rpe === null && 'text-knurl')}>{rpe ?? (targetRpe(s) || '—')}</span>
-                  <CheckCell done={false} onClick={complete} disabled={disabled || busy || reps === ''} label={`세트 ${i + 1}`} />
-                </div>
-                <div className="mt-1.5"><RpeChips value={rpe} onChange={setRpe} disabled={disabled} /></div>
-                <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-dust">
-                  <span>{separate ? '한쪽만 넣으면 그 팔만, 둘 다 비우면 중량 없이 기록' : '값은 다음 세트로 이어집니다'}</span>
-                  <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, open.map((x) => x.id), false, '사용자 스킵', ctx))}><SkipForward size={14} aria-hidden />남은 {open.length}세트 건너뛰기</Chip>
-                </div>
-              </m.li>
-            );
-          }
-          const tappable = s.status === 'planned' && !focused;
-          const L = perf.find((p) => p.side === 'L' || p.side === 'both');
-          const R = perf.find((p) => p.side === 'R');
-          const p0 = perf[0];
-          return (
-            <m.li layout="position" transition={LAYOUT} key={s.id} className={cx(COLS, 'min-h-[40px] rounded-md', s.status === 'done' && justDone.has(s.id) && 'row-done', s.status === 'done' && 'bg-p10/[0.07]')}
-              onClick={tappable ? onFocus : undefined} role={tappable ? 'button' : undefined}>
-              <span className="num-d text-center text-[15px] text-dust">{i + 1}</span>
-              {p0 ? (
-                <>
-                  <button type="button" className="num-d h-[40px] text-center text-[17px]" onClick={() => onEdit({ perf: L ?? p0, group: g, date })}>{L ? (L.weight === null ? '—' : fmtKg(L.weight)) : '—'}</button>
-                  {separate && <button type="button" className="num-d h-[40px] text-center text-[17px]" onClick={() => R && onEdit({ perf: R, group: g, date })}>{R ? (R.weight === null ? '—' : fmtKg(R.weight)) : '—'}</button>}
-                  <span className="num-d text-center text-[17px]">{repsOf(p0)}</span>
-                  <span className="num-d text-center text-[17px]">{p0.rpe ?? '—'}</span>
-                </>
-              ) : (
-                <>
-                  <span className="num-d text-center text-[15px] text-knurl">—</span>
-                  {separate && <span className="num-d text-center text-[15px] text-knurl">—</span>}
-                  <span className="num-d text-center text-[15px] text-knurl">{targetReps(s)}</span>
-                  <span className="num-d text-center text-[15px] text-knurl">{targetRpe(s)}</span>
-                </>
-              )}
-              {s.status === 'done' ? <CheckCell done fresh={justDone.has(s.id)} label={`세트 ${i + 1}`} />
-                : s.status === 'planned' ? <PendingCheck />
-                : <UndoSkip label="건너뜀" onClick={() => void run((d) => unskipSet(d, s.id))} />}
-            </m.li>
-          );
-        })}
-      </ul>
-      {separate && active && focused && (g.performed[active.id] ?? []).length === 1 && (
-        <Btn kind="quiet" className="mt-1 w-full" onClick={() => void run((d, ctx) => markSetDone(d, active.id, ctx))} disabled={disabled}>한 팔만 하고 이 세트 완료 처리</Btn>
+      {focused && active && (
+        <div className="mt-3">
+          <div className="flex gap-3">{kgField(separate ? '왼팔' : '중량', left, setLeft)}{separate && kgField('오른팔', right, setRight)}</div>
+          <div className="mx-auto mt-2 max-w-[220px]"><BigNumber value={reps} onChange={setReps} onStep={(d) => setReps(String(Math.max(0, (Number(reps) || 0) + d)))} step={1} unit={isStatic ? '초' : '회'} label={`${idx + 1}세트 ${isStatic ? '유지 시간' : '반복수'}`} size="md" disabled={disabled} /></div>
+          <div className="mt-3"><RpeCells value={rpe} onChange={setRpe} lo={active.targetRpe} hi={active.targetRpeMax} disabled={disabled} /></div>
+          <p className="mt-1.5 text-[11px] leading-[1.45] text-dust">{separate ? '한쪽만 넣으면 그 팔만, 둘 다 비우면 중량 없이 기록합니다. ' : ''}ARM은 PDF의 RPE를 그대로 따릅니다.</p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, open.map((x) => x.id), false, '사용자 스킵', ctx))}><SkipForward size={13} aria-hidden />남은 {open.length}세트 건너뛰기</Chip>
+            {separate && (g.performed[active.id] ?? []).length === 1 && <Chip disabled={disabled} onClick={() => void run((d, ctx) => markSetDone(d, active.id, ctx))}>한 팔만 하고 완료</Chip>}
+          </div>
+        </div>
+      )}
+      <SetStrip g={g} date={date} activeId={focused ? active?.id : undefined} onEdit={onEdit} labelOf={labelOf} valueOf={(perf) => summarize(perf)} />
+      {focused && active && (
+        <ActionBar onClick={complete} disabled={disabled || busy || reps === ''}>
+          {idx + 1}세트 기록 <span className="num-d text-[19px] font-semibold">{left === '' && right === '' ? '중량 없이' : separate ? `왼 ${left || '-'} 오 ${right || '-'}kg` : `${left}kg`} × {reps || '?'}{isStatic ? '초' : ''}{rpe !== null ? ` @${rpe}` : ''}</span>
+        </ActionBar>
       )}
     </div>
   );
@@ -419,7 +425,7 @@ const ArmFill = ({ g }: { g: DayGroupView }) => {
         <label className="text-[11px] text-dust">반복수<input className="field num-d mt-0.5 text-center" type="number" inputMode="numeric" value={reps} onChange={(e) => setReps(e.target.value)} /></label>
         <label className="text-[11px] text-dust">또는 초<input className="field num-d mt-0.5 text-center" type="number" inputMode="numeric" value={secs} onChange={(e) => setSecs(e.target.value)} /></label>
       </div>
-      {g.instance.arm?.rpe === null && g.instance.arm?.rpeRange === null && <div className="mt-2"><RpeChips value={rpe} onChange={setRpe} label="목표 RPE" /></div>}
+      {g.instance.arm?.rpe === null && g.instance.arm?.rpeRange === null && <div className="mt-2"><div className="mb-1 text-[11px] text-dust">목표 RPE</div><RpeCells value={rpe} onChange={setRpe} /></div>}
       <Btn className="mt-2 w-full" onClick={() => void run((d) => fillArmMissing(d, g.instance.id, { sets: Number(sets), reps: reps ? Number(reps) : null, seconds: secs ? Number(secs) : null, rpe }))}>이 값으로 세트 만들기</Btn>
     </div>
   );
@@ -467,28 +473,42 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
   const dec = st?.lastDecision;
   const doneCount = g.sets.filter((s) => s.status === 'done').length;
   const finished = g.sets.length > 0 && !g.sets.some((s) => s.status === 'planned');
-  const collapsed = finished && !expand;
+  const started = g.sets.some((s) => s.status !== 'planned');
   const perfs = g.sets.flatMap((s) => g.performed[s.id] ?? []);
   const role = ROLE[g.exercise.role] ?? ROLE.accessory;
-  // 아직 시작하지 않았고 지금 입력 중인 운동이 아니면 한 줄로 접는다(지난 기록 요약 + 기록 시작)
-  const idle = !focused && !finished && doneCount === 0 && g.sets.length > 0;
-  const prevSummary = idle ? summarize(lastSessionSets(db, g.exercise.id, date, arm ? armVariantKey(db, g.instance.id) : undefined).filter((p) => p.plannedSetId !== null)) : '';
+  const prevSummary = !focused && !started ? summarize(lastSessionSets(db, g.exercise.id, date, arm ? armVariantKey(db, g.instance.id) : undefined).filter((p) => p.plannedSetId !== null)) : '';
   const hasTags = !!(g.movedFrom || arm?.rom || (arm?.execution.length ?? 0) > 0 || arm?.loadNote || (arm && arm.sourceMissing.includes('intensity')) || arm?.userFilled);
+  const showBody = g.sets.length > 0 && (focused || (started && !finished) || (finished && expand));
+  const nextLine = finished && dec && dec.instanceId === g.instance.id && !arm ? `다음 세션 ${fmtKg(st.nextLoad)}kg. ${dec.reason}` : '';
+  const onHeader = focused ? undefined : finished ? () => setExpand(!expand) : onFocus;
+
   return (
-    <section className="rounded-2xl bg-steel px-3.5 pt-3 pb-3" aria-label={g.instance.exerciseName}>
-      <div className="flex items-start gap-2">
-        <button type="button" className="min-w-0 flex-1 text-left" onClick={finished ? () => setExpand(!expand) : onFocus} aria-expanded={finished ? expand : focused}>
-          <h3 className="truncate text-[16px] leading-tight font-bold">{g.instance.exerciseName}</h3>
-          <div className="num mt-1 flex items-baseline gap-2 text-[12.5px] leading-none text-dust">
-            <span className="shrink-0 font-semibold text-chalk/70">{role.ko}</span>
-            <span className="truncate">{prescriptionText(g)}</span>
-          </div>
+    <section aria-label={g.instance.exerciseName} className={cx(focused ? '-mx-3 bg-steel px-4 pt-4 pb-5' : 'border-b border-rail/80 py-3')}>
+      <div className="flex items-start gap-3">
+        {!focused && (
+          <span aria-hidden className="mt-[3px] flex h-5 w-5 shrink-0 items-center justify-center">
+            {finished ? <Check size={19} strokeWidth={2.6} className="text-chalk" />
+              : started ? <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-chalk"><span className="h-2 w-2 rounded-full bg-chalk" /></span>
+              : <span className="h-5 w-5 rounded-full border-2 border-rail" />}
+          </span>
+        )}
+        <button type="button" className={cx('min-w-0 flex-1 text-left', focused && 'cursor-default')} onClick={onHeader} aria-expanded={finished ? expand : focused}>
+          <h3 className={cx('truncate leading-tight', focused ? 'text-[20px] font-bold' : 'text-[15px] font-semibold')}>{g.instance.exerciseName}</h3>
+          {focused ? (
+            <div className="mt-1 flex items-baseline gap-2 text-[13px] leading-5 text-dust"><span className="shrink-0 font-semibold text-chalk/75">{role.ko}</span><span className="num-d truncate text-[15px]">{prescriptionText(g)}</span></div>
+          ) : finished ? (
+            <div className="num-d truncate text-[15px] leading-5 text-dust">{summarize(perfs) || '기록 없음'}</div>
+          ) : started ? (
+            <div className="num-d truncate text-[14px] leading-5 text-dust">{prescriptionText(g)}</div>
+          ) : (
+            <div className="truncate text-[12px] leading-5 text-dust">{prevSummary ? <>지난번 <span className="num-d text-[14px] text-chalk/80">{prevSummary}</span></> : <>지난 기록 없음&nbsp;&nbsp;<span className="num-d text-[14px]">{prescriptionText(g)}</span></>}</div>
+          )}
         </button>
-        <span className={cx('num-d shrink-0 pt-0.5 text-[16px] leading-none tabular-nums', finished ? 'text-p10' : 'text-chalk')}>{doneCount}<span className="text-knurl">/{g.sets.length}</span></span>
+        <span className={cx('num-d shrink-0 leading-6 tabular-nums', focused ? 'text-[22px]' : 'text-[17px] text-dust', finished && 'text-chalk')}>{doneCount}<span className="text-knurl">/{g.sets.length}</span></span>
         <button type="button" className="press -mt-2 -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-dust" onClick={() => setMenu(true)} aria-label={`${g.instance.exerciseName} 메뉴`}><Ellipsis size={20} aria-hidden /></button>
       </div>
-      {g.sets.length > 1 && !idle && <SetBar sets={g.sets} />}
-      {hasTags && (
+      {nextLine && !focused && <div className={cx('mt-1 truncate text-[12px] text-dust', 'pl-8')}>{nextLine}</div>}
+      {focused && hasTags && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {g.movedFrom && <Tag>{fmtDateKo(g.movedFrom)}에서 옮김</Tag>}
           {arm?.rom && <Tag>{arm.rom}</Tag>}
@@ -498,32 +518,21 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
           {arm?.userFilled && <Badge tone="warn">직접 입력값</Badge>}
         </div>
       )}
-      {dec && !arm && dec.reduceOptions && st.nextLoad === dec.nextLoad && !finished && (
-        <div className="mt-2.5 rounded-lg bg-deck px-3 py-2.5 text-[13px] leading-[1.45]">
+      {focused && dec && !arm && dec.reduceOptions && st.nextLoad === dec.nextLoad && (
+        <div className="mt-3 border-t border-rail pt-3 text-[13px] leading-[1.45]">
           <div>{dec.reason}</div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             <Btn onClick={() => void run((d, ctx) => setNextLoad(d, g.exercise.id, dec.nextLoad, '유지 선택', ctx))}>{fmtKg(dec.nextLoad)}kg 유지</Btn>
-            {dec.reduceOptions.map((o) => <Btn key={o.pct} onClick={() => void run((d, ctx) => setNextLoad(d, g.exercise.id, o.load, `${o.pct}% 감량 승인`, ctx))}>−{o.pct}% → {fmtKg(o.load)}kg</Btn>)}
+            {dec.reduceOptions.map((o) => <Btn key={o.pct} onClick={() => void run((d, ctx) => setNextLoad(d, g.exercise.id, o.load, `${o.pct}% 감량 승인`, ctx))}>{o.pct}% 낮춰 {fmtKg(o.load)}kg</Btn>)}
           </div>
         </div>
       )}
       {arm && g.sets.length === 0 && <ArmFill g={g} />}
-      {idle ? (
-        <button type="button" className="press mt-1.5 -mb-1 flex min-h-11 w-full items-center gap-3 text-left" onClick={onFocus} aria-label={`${g.instance.exerciseName} 기록 시작`}>
-          <span className="flex min-w-0 flex-1 items-baseline gap-2">
-            <span className="shrink-0 text-[12px] text-dust">{prevSummary ? '지난번' : '지난 기록 없음'}</span>
-            {prevSummary && <span className="num-d truncate text-[15px] text-chalk/90">{prevSummary}</span>}
-          </span>
-          <span className="flex h-9 shrink-0 items-center rounded-lg bg-deck px-3.5 text-[13px] font-semibold">시작</span>
-        </button>
-      ) : collapsed ? (
-        <button type="button" className="mt-2.5 block w-full text-left" onClick={() => setExpand(true)} aria-label={`${g.instance.exerciseName} 세트 펼치기`}>
-          <div className="num-d truncate text-[15px]">{summarize(perfs) || '기록 없음'}</div>
-          {dec && dec.instanceId === g.instance.id && !arm && <div className="num truncate text-[12px] text-dust">다음 세션 {fmtKg(st.nextLoad)}kg. {dec.reason}</div>}
-        </button>
-      ) : g.sets.length > 0 && (
-        arm ? <ArmTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} onFocus={onFocus} />
-          : <PbTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} onFocus={onFocus} />
+      {showBody && (
+        <div className={cx(!focused && 'pl-8')}>
+          {arm ? <ArmTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} />
+            : <PbTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} />}
+        </div>
       )}
       {menu && <CardMenu db={db} g={g} date={date} disabled={disabled} isFirst={isFirst} isLast={isLast} onEdit={onEdit} onClose={() => setMenu(false)} />}
     </section>
@@ -566,19 +575,18 @@ const RestTimer = ({ since, target, onClose }: { since: string; target: number; 
   if (elapsed > 20 * 60) return null;
   const done = elapsed >= goal;
   return (
-    <div className="toast-in fixed inset-x-0 z-20 mx-auto max-w-[496px] overflow-hidden rounded-xl bg-deck shadow-lg" role="timer" aria-label={`휴식 ${mmss(elapsed)}, 권장 ${mmss(goal)}`}
-      style={{ marginInline: 'max(12px, calc(50% - 248px))', bottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
-      <div className="flex items-center gap-2 px-3 py-1">
+    <div className="timer-pos fixed inset-x-0 z-20 border-t border-rail bg-steel/95 backdrop-blur" role="timer" aria-label={`휴식 ${mmss(elapsed)}, 권장 ${mmss(goal)}`}>
+      <div className="mx-auto flex h-[56px] max-w-[520px] items-center gap-2 px-4">
         <Timer size={18} className={done ? 'text-p10' : 'text-dust'} aria-hidden />
         <span className="num-d text-[22px] leading-none">{mmss(elapsed)}</span>
         <span className="num text-[12px] text-dust">/ {mmss(goal)}{done ? ', 휴식 충분' : ''}</span>
         <span className="ml-auto flex gap-1">
-          <Btn className="!min-h-9 px-2 text-[13px]" onClick={() => setExtra(extra - 15)}>−15</Btn>
-          <Btn className="!min-h-9 px-2 text-[13px]" onClick={() => setExtra(extra + 15)}>+15</Btn>
-          <Btn kind="quiet" className="!min-h-9 px-2 text-[13px]" onClick={onClose}>닫기</Btn>
+          <Chip className="!h-9 px-3 num-d !text-[15px]" onClick={() => setExtra(extra - 15)} aria-label="권장 시간 15초 줄이기">−15</Chip>
+          <Chip className="!h-9 px-3 num-d !text-[15px]" onClick={() => setExtra(extra + 15)} aria-label="권장 시간 15초 늘리기">+15</Chip>
+          <button type="button" className="press flex h-9 w-9 items-center justify-center rounded-lg text-dust" onClick={onClose} aria-label="휴식 타이머 닫기"><X size={16} aria-hidden /></button>
         </span>
       </div>
-      <div className="h-1 bg-rail">
+      <div className="absolute inset-x-0 top-0 h-[3px] bg-rail">
         <div className="rest-bar h-full origin-left" style={{ transform: `scaleX(${Math.min(1, elapsed / goal)})`, background: done ? 'var(--color-p10)' : 'var(--color-p15)' }} />
       </div>
     </div>
@@ -631,27 +639,27 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       <header className="flex items-center gap-1">
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, -1))} aria-label="전날"><ChevronLeft size={22} /></button>
         <div className="min-w-0 flex-1 text-center">
-          <h1 className="text-[17px] leading-tight font-extrabold">{fmtDateKo(date)}{date === today ? ' 오늘' : ''}</h1>
-          <div className="num flex h-5 items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `계획 ${done}/${total}세트` : '계획 없음'}</span>{date !== today && <button type="button" className="press relative inline-flex h-5 items-center rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</div>
+          <h1 className="text-[16px] leading-5 font-bold">{fmtDateKo(date)}</h1>
+          <div className="num flex h-5 items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `${date === today ? '오늘, ' : ''}${total}세트 중 ${done}세트` : '계획 없음'}</span>{date !== today && <button type="button" className="press relative inline-flex h-5 items-center rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</div>
         </div>
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, 1))} aria-label="다음 날"><ChevronRight size={22} /></button>
       </header>
 
       {session && !here && (
-        <div className="mt-1.5 rounded-xl border border-p15/60 p-2.5 text-[13px]">
+        <div className="-mx-3 mt-1 border-y border-rail px-4 py-3 text-[13px] leading-[1.5]">
           <b>{fmtDateKo(session.date)} 세션이 진행 중입니다.</b> 자정을 넘겨도 세션은 시작한 날짜에 귀속됩니다. 이어서 기록하거나 종료한 뒤 이 날짜를 기록하세요.
           <div className="mt-2 flex gap-2"><Btn className="flex-1" onClick={() => onDate(session.date)}>진행 중 세션으로</Btn><Btn className="flex-1" onClick={finish}>세션 종료</Btn></div>
         </div>
       )}
       {(here || needsBw) && (
-        <div className="mt-1.5 rounded-xl bg-steel px-3 text-[13px]">
-          <div className="flex min-h-[46px] items-center justify-between gap-2">
+        <div className="-mx-3 mt-1 border-y border-rail px-4 text-[13px]">
+          <div className="flex min-h-11 items-center justify-between gap-2">
             <span className="num min-w-0 truncate">
               {here ? <><b className="font-semibold text-p10">세션 진행 중</b> <span className="text-dust">{new Date(here.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: db.settings.timezone })} 시작</span></> : session ? <span className="text-dust">이 날짜의 체중</span> : <span className="text-dust">첫 세트를 기록하면 세션이 시작됩니다</span>}
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
-              {needsBw && <button type="button" className={cx('press num h-9 rounded-md px-2', curBw ? 'bg-deck' : 'border border-p25 text-p25')} aria-expanded={bwOpen} onClick={() => setBwOpen(!bwOpen)}>체중 <span className="num-d text-[15px]">{curBw ? `${curBw}` : '입력'}</span></button>}
-              {here && <Btn className="!min-h-9" onClick={finish} disabled={readOnly}>세션 종료</Btn>}
+              {needsBw && <button type="button" className={cx('press num h-8 rounded-lg border px-2.5', curBw ? 'border-rail' : 'border-p25 text-p25')} aria-expanded={bwOpen} onClick={() => setBwOpen(!bwOpen)}>체중 <span className="num-d text-[15px]">{curBw ? `${curBw}` : '입력'}</span></button>}
+              {here && <button type="button" className="press h-8 rounded-lg border border-rail px-2.5 font-semibold" onClick={finish} disabled={readOnly}>세션 종료</button>}
             </span>
           </div>
           {needsBw && (bwOpen || !curBw) && (
@@ -671,7 +679,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       {groups.length === 0 && (
         <div className="mt-4"><Empty>{db.settings.programStart && date < db.settings.programStart ? `프로그램 시작일(${fmtDateKo(db.settings.programStart)}) 이전입니다.` : '이 날짜에 예정된 운동이 없습니다. 캘린더에서 다른 날의 운동을 옮겨 올 수 있습니다.'}</Empty></div>
       )}
-      <div className="mt-2.5 space-y-2.5">
+      <div className={cx(groups.length > 0 && 'mt-1')}>
         {groups.map((g, i) => (
           <m.div key={g.instance.id} layout="position" transition={LAYOUT}>
             <GroupCard db={db} g={g} date={date} disabled={blocked} onEdit={setEdit} isFirst={i === 0} isLast={i === groups.length - 1}

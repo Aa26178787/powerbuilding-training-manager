@@ -12,7 +12,7 @@ export const Btn = ({ kind = 'ghost', className, ...p }: React.ButtonHTMLAttribu
     {...p}
     className={cx(
       'press inline-flex min-h-[42px] min-w-[42px] items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold select-none',
-      kind === 'primary' && 'bg-p15 text-[#1b1608]',
+      kind === 'primary' && 'bg-p15 text-iron',
       kind === 'ghost' && 'bg-deck',
       kind === 'quiet' && 'text-dust',
       kind === 'danger' && 'border border-p25 text-p25',
@@ -182,7 +182,7 @@ export const RpePicker = ({ value, onChange, cap, disabled }: { value: number | 
         <button
           key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled}
           onClick={() => onChange(value === r ? null : r)}
-          className={cx('num h-[42px] rounded-lg border text-[13px] font-bold', value === r ? (cap !== undefined && r > cap ? 'border-p25 bg-p25 text-white' : 'border-p15 bg-p15 text-[#1b1608]') : 'border-rail text-dust')}
+          className={cx('num h-[42px] rounded-lg border text-[13px] font-bold', value === r ? (cap !== undefined && r > cap ? 'border-p25 bg-p25 text-white' : 'border-p15 bg-p15 text-iron') : 'border-rail text-dust')}
         >{r}</button>
       ))}
     </div>
@@ -196,19 +196,19 @@ export const RpeChips = ({ value, onChange, cap, disabled, label = '실제 RPE' 
       <button
         key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled}
         onClick={() => onChange(value === r ? null : r)}
-        className={cx('press num-d h-10 rounded-md text-[15px]', value === r ? (cap !== undefined && r > cap ? 'bg-p25 text-white' : 'bg-p15 text-[#1b1608]') : 'bg-iron text-chalk/80')}
+        className={cx('press num-d h-10 rounded-md text-[15px]', value === r ? (cap !== undefined && r > cap ? 'bg-p25 text-white' : 'bg-p15 text-iron') : 'bg-iron text-chalk/80')}
       >{r}</button>
     ))}
   </div>
 );
 
-const PLATE_COLOR: Record<string, string> = { 25: '#d8402f', 20: '#3f7fe0', 15: '#f2c230', 10: '#3fa568', 5: '#e8e6df', 2.5: '#30343b', 1.25: '#9aa0aa' };
+export const PLATE_COLOR: Record<string, string> = { 25: '#d8402f', 20: '#3f7fe0', 15: '#f2c230', 10: '#3fa568', 5: '#e8e6df', 2.5: '#30343b', 1.25: '#9aa0aa' };
 /** 한쪽 원판 구성. 색은 경기용 원판 색, 숫자를 함께 표기 */
 export const PlateChips = ({ perSide, remainder }: { perSide: number[]; remainder: number }) => (
   <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-dust" aria-label={`한쪽 원판 ${perSide.join(', ') || '없음'}`}>
     {perSide.length === 0 && <span>빈 바</span>}
     {perSide.map((p, i) => (
-      <span key={i} className="num rounded px-1 py-0.5 text-[11px] font-bold" style={{ background: PLATE_COLOR[String(p)] ?? '#6b7280', color: [5, 15].includes(p) ? '#1b1608' : '#fff', border: '1px solid rgba(255,255,255,.18)' }}>{p}</span>
+      <span key={i} className="num rounded px-1 py-0.5 text-[11px] font-bold" style={{ background: PLATE_COLOR[String(p)] ?? '#6b7280', color: [5, 15].includes(p) ? '#141518' : '#fff', border: '1px solid rgba(255,255,255,.18)' }}>{p}</span>
     ))}
     {remainder > 0 && <span className="text-p25">보유 원판으로 {remainder}kg 부족</span>}
   </div>

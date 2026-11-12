@@ -127,6 +127,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bodyweight: null,
   barWeight: 20,
   plates: [25, 20, 15, 10, 5, 2.5, 1.25, 0.75, 0.25],
+  meetDate: '2026-11-29',
   programStart: null,
   onboardingDone: false,
   armMode: 3,

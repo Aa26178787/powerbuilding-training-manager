@@ -2,12 +2,13 @@
 import { useState } from 'react';
 import type { Db, ExerciseState, ISODate, Patch } from '../../domain/types';
 import { fmtDateKo, isISODate, weekStart } from '../../engine/dates';
-import { minBarbellStep } from '../../engine/rounding';
+import { minBarbellStep, PlateStock } from '../../engine/rounding';
 import { setSeed } from '../../application/session';
 import { BackupCheck, buildBackup, parseBackup } from '../../data-import/backup';
 import { performedCsv } from '../../application/analysis';
 import { ask, isStandalone, promptInstall, requestPersist, restoreBackup, run, toast, todayStr, useApp, wipeAll } from '../store';
-import { Badge, Btn, Row, SectionTitle } from '../components';
+import { Minus, Plus, X } from 'lucide-react';
+import { Badge, Btn, Chip, PLATE_COLOR, Row, SectionTitle } from '../components';
 
 export const SEED_EXERCISES = ['comp_squat', 'comp_bench', 'comp_sumo', 'conv_dl', 'dips_strength', 'pullup_strength'];
 
@@ -35,6 +36,53 @@ export const SeedEditor = ({ db, exerciseId, compact }: { db: Db; exerciseId: st
   );
 };
 
+/** 보유 원판: 종류별 쌍 수. 비우면 제한 없음, 0이면 쓰지 않음. 바꾸는 즉시 저장 */
+const PlateStockEditor = ({ db }: { db: Db }) => {
+  const s = db.settings;
+  const stock: PlateStock[] = s.plateStock ?? s.plates.map((kg) => ({ kg, pairs: null }));
+  const [kg, setKg] = useState('');
+  const save = (next: PlateStock[]) => {
+    const sorted = [...next].sort((a, b) => b.kg - a.kg);
+    void run(() => ({ settings: { plateStock: sorted, plates: sorted.filter((p) => p.pairs !== 0).map((p) => p.kg) } }));
+  };
+  const setPairs = (i: number, pairs: number | null) => save(stock.map((p, j) => (j === i ? { ...p, pairs } : p)));
+  const add = () => {
+    const n = Number(kg);
+    if (!(n > 0 && n <= 50)) { toast('원판 무게를 0보다 크고 50 이하로 입력하세요', 'error'); return; }
+    if (stock.some((p) => p.kg === n)) { toast(`${n}kg 원판은 이미 있습니다`, 'error'); return; }
+    save([...stock, { kg: n, pairs: 1 }]); setKg('');
+  };
+  return (
+    <div className="py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm">보유 원판</span>
+        <span className="num text-xs text-dust">바벨 최소 증량 {minBarbellStep(s.plates, s.plateStock)}kg</span>
+      </div>
+      <p className="mt-1 text-xs leading-[1.5] text-dust">쌍 수는 양쪽에 한 장씩 끼울 수 있는 수입니다. 비워 두면 제한 없이, 0이면 쓰지 않습니다. 계산은 가진 수량 안에서 목표에 가장 가까운 조합을 찾고, 큰 원판을 안쪽에 끼웁니다.</p>
+      <ul className="mt-2 divide-y divide-rail/70">
+        {stock.map((p, i) => (
+          <li key={p.kg} className="flex min-h-[48px] items-center gap-3">
+            <span aria-hidden className="h-6 w-2 shrink-0 rounded-sm" style={{ background: PLATE_COLOR[String(p.kg)] ?? '#6b7280', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.18)' }} />
+            <span className={`num-d w-14 text-[17px] ${p.pairs === 0 ? 'text-knurl line-through' : ''}`}>{p.kg}kg</span>
+            <span className="flex flex-1 items-center justify-end gap-1.5">
+              <button type="button" className="press flex h-10 w-10 items-center justify-center rounded-lg bg-deck disabled:opacity-40" aria-label={`${p.kg}kg 한 쌍 빼기`} disabled={p.pairs === null || p.pairs === 0} onClick={() => setPairs(i, Math.max(0, (p.pairs ?? 0) - 1))}><Minus size={16} aria-hidden /></button>
+              <input className="field num h-10 w-20 text-center" type="number" inputMode="numeric" min={0} max={20} aria-label={`${p.kg}kg 보유 쌍 수`} placeholder="제한 없음"
+                value={p.pairs ?? ''} onChange={(e) => { const v = e.target.value; if (v === '') { setPairs(i, null); return; } const n = Math.floor(Number(v)); if (n >= 0 && n <= 20) setPairs(i, n); }} />
+              <button type="button" className="press flex h-10 w-10 items-center justify-center rounded-lg bg-deck disabled:opacity-40" aria-label={`${p.kg}kg 한 쌍 더하기`} disabled={p.pairs !== null && p.pairs >= 20} onClick={() => setPairs(i, (p.pairs ?? 0) + 1)}><Plus size={16} aria-hidden /></button>
+              <span className="w-5 text-xs text-dust">쌍</span>
+              <button type="button" className="press flex h-10 w-8 items-center justify-center rounded-lg text-dust" aria-label={`${p.kg}kg 원판 목록에서 지우기`} onClick={() => save(stock.filter((_, j) => j !== i))}><X size={16} aria-hidden /></button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2 flex gap-1.5">
+        <input className="field num flex-1" type="number" inputMode="decimal" placeholder="다른 무게 추가(kg), 예: 0.5" value={kg} onChange={(e) => setKg(e.target.value)} />
+        <Chip className="!h-11 px-4" disabled={!kg} onClick={add}>추가</Chip>
+      </div>
+    </div>
+  );
+};
+
 const download = (name: string, text: string, type = 'application/json') => {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
@@ -46,7 +94,6 @@ const download = (name: string, text: string, type = 'application/json') => {
 export const SettingsScreen = () => {
   const { db, persisted, canInstall, installed } = useApp();
   const [bw, setBw] = useState('');
-  const [plates, setPlates] = useState('');
   const [includeArm, setIncludeArm] = useState(false);
   const [check, setCheck] = useState<BackupCheck | null>(null);
   const [start, setStart] = useState('');
@@ -144,14 +191,13 @@ export const SettingsScreen = () => {
         <Row label={`체중 (현재 ${s.bodyweight ?? '미입력'}kg)`}>
           <span className="flex gap-1.5"><input className="field num w-24 text-center" type="number" inputMode="decimal" value={bw} placeholder="kg" onChange={(e) => setBw(e.target.value)} /><Btn disabled={!bw} onClick={async () => { const n = Number(bw); if (!(n > 20 && n < 300)) { toast('체중 값을 확인하세요', 'error'); return; } const r = await run(() => ({ settings: { bodyweight: n } })); if (r.ok) setBw(''); }}>저장</Btn></span>
         </Row>
+        <Row label="대회 날짜">
+          <input className="field num w-40" type="date" aria-label="대회 날짜" value={s.meetDate === undefined ? '2026-11-29' : s.meetDate ?? ''} onChange={(e) => void run(() => ({ settings: { meetDate: e.target.value || null } }))} />
+        </Row>
         <Row label="바 무게">
           <select className="field num w-24" value={s.barWeight} onChange={(e) => void run(() => ({ settings: { barWeight: Number(e.target.value) } }))}>{[20, 15, 10].map((n) => <option key={n} value={n}>{n}kg</option>)}</select>
         </Row>
-        <div className="py-2">
-          <div className="text-sm text-dust">보유 원판(kg, 한쪽 기준). 바벨 최소 증량 {minBarbellStep(s.plates)}kg</div>
-          <div className="mt-1 flex gap-1.5"><input className="field num flex-1" placeholder={s.plates.join(', ')} value={plates} onChange={(e) => setPlates(e.target.value)} />
-            <Btn disabled={!plates} onClick={async () => { const list = plates.split(/[,\s]+/).map(Number).filter((n) => n > 0 && n <= 50); if (!list.length) { toast('원판 무게를 쉼표로 구분해 입력하세요', 'error'); return; } const r = await run(() => ({ settings: { plates: [...new Set(list)].sort((a, b) => b - a) } })); if (r.ok) setPlates(''); }}>저장</Btn></div>
-        </div>
+        <PlateStockEditor db={db} />
         <Row label="화면 테마">
           <select className="field w-28" value={s.theme} onChange={(e) => void run(() => ({ settings: { theme: e.target.value as 'dark' | 'light' | 'system' } }))}><option value="dark">어둡게</option><option value="light">밝게</option><option value="system">기기 설정</option></select>
         </Row>

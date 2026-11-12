@@ -362,6 +362,10 @@ export interface Settings {
   barWeight: number;
   /** 보유 원판(kg, 한쪽에 끼울 수 있는 종류) */
   plates: number[];
+  /** 대회 날짜. 홈에 남은 날을 보여 준다 */
+  meetDate?: ISODate | null;
+  /** 종류별 보유 쌍 수. 없으면 plates의 종류를 제한 없이 쓴다 */
+  plateStock?: { kg: number; pairs: number | null }[];
   /** 프로그램 시작 주(월요일). 이 주부터 주간 계획을 생성 */
   programStart: ISODate | null;
   onboardingDone: boolean;

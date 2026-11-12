@@ -210,3 +210,26 @@ describe('달성률 (TC-010, TC-011, TC-022)', () => {
     expect(r.dueSoFar).toEqual({ done: 5, total: 5, pct: 100 });
   });
 });
+
+describe('보유 원판 수량', () => {
+  const stock = [{ kg: 25, pairs: 1 }, { kg: 20, pairs: 2 }, { kg: 10, pairs: 1 }, { kg: 5, pairs: 1 }, { kg: 2.5, pairs: 1 }, { kg: 1.25, pairs: null }];
+  it('가진 쌍 수를 넘지 않고, 큰 원판부터 안쪽에 끼운다', () => {
+    const b = plateBreakdown(162.5, 20, [], stock);
+    expect(b?.perSide).toEqual([25, 20, 20, 5, 1.25]);
+    expect(b?.remainder).toBe(0);
+  });
+  it('수량이 모자라면 가능한 가장 가까운 아래 중량과 부족분을 알려 준다', () => {
+    const b = plateBreakdown(250, 20, [], [{ kg: 25, pairs: 2 }, { kg: 20, pairs: 1 }]);
+    expect(b?.perSide).toEqual([25, 25, 20]);
+    expect(b?.remainder).toBe(90);
+  });
+  it('욕심 계산으로는 못 찾는 조합도 찾는다', () => {
+    // 한쪽 30kg: 25를 쓰면 5가 없어 실패, 15+15가 정답
+    const b = plateBreakdown(80, 20, [], [{ kg: 25, pairs: 1 }, { kg: 15, pairs: 2 }]);
+    expect(b?.perSide).toEqual([15, 15]);
+    expect(b?.remainder).toBe(0);
+  });
+  it('0쌍인 원판은 쓰지 않고, 최소 증량에도 반영한다', () => {
+    expect(minBarbellStep([], [{ kg: 25, pairs: 2 }, { kg: 1.25, pairs: 0 }, { kg: 2.5, pairs: 1 }])).toBe(5);
+  });
+});
