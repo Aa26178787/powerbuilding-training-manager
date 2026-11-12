@@ -1,0 +1,206 @@
+// 설정·데이터: 프로필, 기준 기록, 증량 단위, 백업·복원, 저장소 상태
+import { useState } from 'react';
+import type { Db, ExerciseState, ISODate, Patch } from '../../domain/types';
+import { fmtDateKo, isISODate, weekStart } from '../../engine/dates';
+import { minBarbellStep } from '../../engine/rounding';
+import { setSeed } from '../../application/session';
+import { BackupCheck, buildBackup, parseBackup } from '../../data-import/backup';
+import { performedCsv } from '../../application/analysis';
+import { ask, isStandalone, promptInstall, requestPersist, restoreBackup, run, toast, todayStr, useApp, wipeAll } from '../store';
+import { Badge, Btn, Row, SectionTitle } from '../components';
+
+export const SEED_EXERCISES = ['comp_squat', 'comp_bench', 'comp_sumo', 'conv_dl', 'dips_strength', 'pullup_strength'];
+
+export const SeedEditor = ({ db, exerciseId, compact }: { db: Db; exerciseId: string; compact?: boolean }) => {
+  const ex = db.exercises[exerciseId];
+  const seed = db.exStates[exerciseId]?.seed;
+  const [v, setV] = useState({ w: seed?.weight?.toString() ?? '', r: seed?.reps?.toString() ?? '', p: seed?.rpe?.toString() ?? '' });
+  if (!ex) return null;
+  const dirty = v.w !== (seed?.weight?.toString() ?? '') || v.r !== (seed?.reps?.toString() ?? '') || v.p !== (seed?.rpe?.toString() ?? '');
+  const save = async () => {
+    const s: ExerciseState['seed'] = v.w === '' ? undefined : { weight: Number(v.w), reps: Number(v.r), rpe: Number(v.p), bodyweight: ex.loadMode === 'bodyweight_plus' ? db.settings.bodyweight ?? undefined : undefined };
+    const r = await run((d, ctx) => setSeed(d, exerciseId, s, ctx));
+    if (r.ok && !compact) toast('기준 기록을 저장했습니다');
+  };
+  return (
+    <div className="py-2">
+      <div className="mb-1 text-sm font-semibold">{ex.name}{ex.loadMode === 'bodyweight_plus' ? <span className="font-normal text-dust"> — 추가 중량</span> : null}</div>
+      <div className="flex items-end gap-1.5">
+        {([['w', 'kg'], ['r', '회'], ['p', 'RPE']] as const).map(([k, l]) => (
+          <label key={k} className="flex-1 text-[11px] text-dust">{l}<input className="field num mt-0.5 px-1 text-center" type="number" inputMode="decimal" step="any" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} onBlur={() => { if (compact && dirty && (v.w === '' || (v.r && v.p))) void save(); }} /></label>
+        ))}
+        {!compact && <Btn disabled={!dirty || (v.w !== '' && (!v.r || !v.p))} onClick={save}>저장</Btn>}
+      </div>
+    </div>
+  );
+};
+
+const download = (name: string, text: string, type = 'application/json') => {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+export const SettingsScreen = () => {
+  const { db, persisted, canInstall, installed } = useApp();
+  const [bw, setBw] = useState('');
+  const [plates, setPlates] = useState('');
+  const [includeArm, setIncludeArm] = useState(false);
+  const [check, setCheck] = useState<BackupCheck | null>(null);
+  const [start, setStart] = useState('');
+  if (!db) return null;
+  const s = db.settings;
+  const hasPbRecords = Object.values(db.performed).some((p) => !p.exerciseId.startsWith('arm:'));
+  const exportNow = async () => {
+    const now = new Date().toISOString();
+    const text = JSON.stringify(buildBackup(db, includeArm, now));
+    if (import.meta.env.VITE_PREVIEW) {
+      try { await navigator.clipboard.writeText(text); toast('이 미리보기에서는 파일 저장이 막혀 있어 백업 내용을 클립보드에 복사했습니다'); } catch { toast('이 미리보기에서는 백업 파일을 내보낼 수 없습니다', 'error'); }
+      return;
+    }
+    download(`ptm-backup-${todayStr()}${includeArm ? '-with-arm' : ''}.json`, text);
+    await run(() => ({ settings: { lastBackupAt: now } }));
+    toast(includeArm ? '백업 파일을 내보냈습니다. ARM 자료가 들어 있으니 공유·공개 업로드하지 마세요' : '백업 파일을 내보냈습니다');
+  };
+  const onImport = async (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > 30 * 1024 * 1024) { setCheck({ ok: false, errors: ['파일이 너무 큽니다(최대 30MB)'] }); return; }
+    setCheck(parseBackup(await f.text()));
+  };
+  const changeStart = async () => {
+    if (!isISODate(start)) return;
+    const del: Patch['del'] = {
+      workouts: Object.values(db.workouts).filter((w) => w.track === 'pb').map((w) => w.id),
+      instances: Object.values(db.instances).filter((i) => i.track === 'pb').map((i) => i.id),
+      plannedSets: Object.values(db.plannedSets).filter((x) => x.track === 'pb').map((x) => x.id),
+    };
+    const versions = Object.values(db.versions).map((v) => (v.version === 1 ? { ...v, effectiveFrom: weekStart(start as ISODate) } : v));
+    const r = await run(() => ({ del, put: { versions }, settings: { programStart: start as ISODate } }));
+    if (r.ok) { toast(`프로그램 시작일을 ${fmtDateKo(start as ISODate)}로 바꿨습니다`); setStart(''); }
+  };
+
+  return (
+    <div>
+      <header><h1 className="text-xl font-extrabold">설정·데이터</h1></header>
+
+      <SectionTitle>이 기기에서 쓰기</SectionTitle>
+      <div className="rounded-xl bg-steel px-4 py-2">
+        <Row label="홈 화면 설치">
+          {installed || isStandalone() ? <Badge tone="ok">설치됨</Badge>
+            : canInstall ? <Btn kind="primary" onClick={async () => { if (await promptInstall()) { toast('홈 화면에 설치했습니다'); void requestPersist(); } }}>설치</Btn>
+            : <span className="text-xs text-dust">Chrome 메뉴 ⋮ → 홈 화면에 추가</span>}
+        </Row>
+        <Row label="세션 중 화면 켜 두기">
+          <input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세션 중 화면 켜 두기" checked={s.keepAwake} onChange={(e) => void run(() => ({ settings: { keepAwake: e.target.checked } }))} />
+        </Row>
+        <Row label="휴식 타이머">
+          <input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="휴식 타이머" checked={s.restTimer} onChange={(e) => void run(() => ({ settings: { restTimer: e.target.checked } }))} />
+        </Row>
+        <Row label="세트 완료 진동">
+          <input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세트 완료 진동" checked={s.haptics} onChange={(e) => void run(() => ({ settings: { haptics: e.target.checked } }))} />
+        </Row>
+        <p className="pb-2 text-xs text-dust">설치하면 주소창 없이 열리고, 브라우저가 기록을 지울 가능성이 줄어듭니다. 그래도 백업 파일은 주기적으로 내보내세요.</p>
+      </div>
+
+      <SectionTitle>백업·복원</SectionTitle>
+      <div className="rounded-xl bg-steel p-4">
+        <Row label="마지막 백업">{s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString('ko-KR', { timeZone: s.timezone }) : <Badge tone="warn">없음</Badge>}</Row>
+        <Row label="브라우저 영구 저장">
+          {persisted === true ? <Badge tone="ok">허용됨</Badge> : persisted === false ? <span className="flex items-center gap-2"><Badge tone="warn">허용 안 됨</Badge><Btn onClick={async () => toast((await requestPersist()) ? '영구 저장이 허용되었습니다' : '브라우저가 허용하지 않았습니다. 홈 화면에 앱을 추가하고 정기적으로 백업하세요')}>요청</Btn></span> : <Badge>이 브라우저는 지원하지 않음</Badge>}
+        </Row>
+        <p className="text-xs text-dust">기록은 이 기기의 브라우저에만 저장됩니다. 브라우저 데이터를 지우거나 오래 쓰지 않으면 사라질 수 있으니(특히 홈 화면에 추가하지 않은 iOS Safari) 백업 파일을 주기적으로 내보내세요.</p>
+        <label className="mt-3 flex min-h-[44px] cursor-pointer items-center gap-3 text-sm">
+          <input type="checkbox" className="h-5 w-5 accent-[var(--color-p15)]" checked={includeArm} disabled={!db.arm} onChange={(e) => setIncludeArm(e.target.checked)} />
+          ARM 처방 라이브러리 포함 <span className="text-xs text-dust">(저작권 자료 — 개인 보관용으로만)</span>
+        </label>
+        <Btn kind="primary" className="w-full" onClick={exportNow}>백업 파일 내보내기</Btn>
+        <Btn className="mt-2 w-full" onClick={async () => {
+          const csv = performedCsv(db);
+          if (import.meta.env.VITE_PREVIEW) { try { await navigator.clipboard.writeText(csv); toast('이 미리보기에서는 파일 저장이 막혀 있어 CSV 내용을 클립보드에 복사했습니다'); } catch { toast('이 미리보기에서는 CSV를 내보낼 수 없습니다', 'error'); } return; }
+          download(`ptm-records-${todayStr()}.csv`, csv, 'text/csv;charset=utf-8'); toast('수행 기록 CSV를 내보냈습니다');
+        }}>수행 기록 CSV 내보내기</Btn>
+        <label className="mt-2 block">
+          <span className="tap flex w-full cursor-pointer items-center justify-center rounded-[10px] border border-rail bg-iron px-4 text-[15px] font-semibold">백업 파일에서 복원</span>
+          <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { void onImport(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+        {check && (
+          <div className="mt-3 rounded-lg bg-iron p-3 text-sm">
+            {!check.ok ? <ul className="list-disc pl-5 text-p25">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : (
+              <>
+                <div className="font-bold">복원 미리보기</div>
+                <div className="num mt-1 text-dust">내보낸 시각 {check.summary?.exportedAt.slice(0, 16).replace('T', ' ')} · 세션 {check.summary?.counts.sessions ?? 0} · 수행 세트 {check.summary?.counts.performed ?? 0} · 계획 세트 {check.summary?.counts.plannedSets ?? 0} · ARM {check.summary?.includesArm ? '포함' : '미포함'}</div>
+                <p className="mt-2 text-p15">지금 이 기기의 모든 데이터가 이 파일 내용으로 바뀝니다.</p>
+                <div className="mt-2 flex gap-2"><Btn className="flex-1" onClick={() => setCheck(null)}>취소</Btn><Btn kind="danger" className="flex-1" onClick={async () => { await restoreBackup(check.db as Db); setCheck(null); toast('백업에서 복원했습니다'); }}>이 파일로 복원</Btn></div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <SectionTitle>프로필</SectionTitle>
+      <div className="rounded-xl bg-steel px-4 py-2">
+        <Row label={`체중 (현재 ${s.bodyweight ?? '미입력'}kg)`}>
+          <span className="flex gap-1.5"><input className="field num w-24 text-center" type="number" inputMode="decimal" value={bw} placeholder="kg" onChange={(e) => setBw(e.target.value)} /><Btn disabled={!bw} onClick={async () => { const n = Number(bw); if (!(n > 20 && n < 300)) { toast('체중 값을 확인하세요', 'error'); return; } const r = await run(() => ({ settings: { bodyweight: n } })); if (r.ok) setBw(''); }}>저장</Btn></span>
+        </Row>
+        <Row label="바 무게">
+          <select className="field num w-24" value={s.barWeight} onChange={(e) => void run(() => ({ settings: { barWeight: Number(e.target.value) } }))}>{[20, 15, 10].map((n) => <option key={n} value={n}>{n}kg</option>)}</select>
+        </Row>
+        <div className="py-2">
+          <div className="text-sm text-dust">보유 원판 (한쪽에 끼우는 종류, kg) — 바벨 최소 증량 {minBarbellStep(s.plates)}kg</div>
+          <div className="mt-1 flex gap-1.5"><input className="field num flex-1" placeholder={s.plates.join(', ')} value={plates} onChange={(e) => setPlates(e.target.value)} />
+            <Btn disabled={!plates} onClick={async () => { const list = plates.split(/[,\s]+/).map(Number).filter((n) => n > 0 && n <= 50); if (!list.length) { toast('원판 무게를 쉼표로 구분해 입력하세요', 'error'); return; } const r = await run(() => ({ settings: { plates: [...new Set(list)].sort((a, b) => b - a) } })); if (r.ok) setPlates(''); }}>저장</Btn></div>
+        </div>
+        <Row label="화면 테마">
+          <select className="field w-28" value={s.theme} onChange={(e) => void run(() => ({ settings: { theme: e.target.value as 'dark' | 'light' | 'system' } }))}><option value="dark">어둡게</option><option value="light">밝게</option><option value="system">기기 설정</option></select>
+        </Row>
+        <Row label="시간대">{s.timezone}</Row>
+      </div>
+
+      <SectionTitle>기준 기록 — 첫 중량 추천에 사용</SectionTitle>
+      <div className="divide-y divide-rail rounded-xl bg-steel px-4">
+        {SEED_EXERCISES.map((id) => <SeedEditor key={id} db={db} exerciseId={id} />)}
+      </div>
+      <p className="mt-1 text-xs text-dust">최근에 한 세트 하나(중량·반복·RPE)를 넣으면 보수적 e1RM으로 첫 Top Set을 제안합니다. 비워 두면 첫 세션에서 직접 입력합니다.</p>
+
+      <SectionTitle>운동별 증량·반올림 단위</SectionTitle>
+      <div className="divide-y divide-rail rounded-xl bg-steel px-4">
+        {Object.values(db.exercises).filter((e) => e.role !== 'arm').map((e) => (
+          <div key={e.id} className="flex min-h-[48px] items-center justify-between gap-2 py-1 text-sm">
+            <span className="min-w-0 truncate">{e.name}</span>
+            <span className="flex shrink-0 gap-1.5">
+              <select className="field num w-24" value={e.increment} aria-label={`${e.name} 증량 단위`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, increment: Number(ev.target.value) }] } }))}>
+                {[...new Set([0.5, 1, 1.25, 2, 2.5, 5, e.increment])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}kg</option>)}
+              </select>
+              <select className="field w-20" value={e.rounding} aria-label={`${e.name} 반올림`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, rounding: ev.target.value as 'down' | 'nearest' }] } }))}><option value="down">내림</option><option value="nearest">반올림</option></select>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <SectionTitle>프로그램 시작일</SectionTitle>
+      <div className="rounded-xl bg-steel p-4 text-sm">
+        <div>현재: <b className="num">{s.programStart ? `${s.programStart} ${fmtDateKo(s.programStart)}` : '미설정'}</b></div>
+        {hasPbRecords ? <p className="mt-1 text-xs text-dust">기록이 있어서 시작일을 바꿀 수 없습니다.</p> : (
+          <div className="mt-2 flex gap-1.5"><input className="field num flex-1" type="date" value={start} onChange={(e) => setStart(e.target.value)} /><Btn disabled={!isISODate(start)} onClick={changeStart}>변경</Btn></div>
+        )}
+      </div>
+
+      <SectionTitle>계산 설정</SectionTitle>
+      <div className="rounded-xl bg-steel px-4 py-2">
+        <Row label="세트 간 예상 RPE 상승폭">
+          <select className="field num w-24" value={s.rpeDriftPerSet} onChange={(e) => void run(() => ({ settings: { rpeDriftPerSet: Number(e.target.value) } }))}>{[0, 0.25, 0.5, 0.75, 1].map((n) => <option key={n} value={n}>{n}</option>)}</select>
+        </Row>
+        <Row label="백업 알림 주기">
+          <select className="field num w-24" value={s.backupReminderDays} onChange={(e) => void run(() => ({ settings: { backupReminderDays: Number(e.target.value) } }))}>{[3, 7, 14, 30].map((n) => <option key={n} value={n}>{n}일</option>)}</select>
+        </Row>
+        <p className="pb-2 text-xs text-dust">개인 보정계수와 학습 설정은 [더보기 → 모델 실험실]에서 봅니다.</p>
+      </div>
+
+      <SectionTitle>초기화</SectionTitle>
+      <Btn kind="danger" className="w-full" onClick={async () => { if (await ask('이 기기의 모든 기록·계획·ARM 데이터를 지웁니다. 되돌릴 수 없습니다. 먼저 백업했는지 확인하세요.', '모두 지우기')) void wipeAll(); }}>모든 데이터 지우기</Btn>
+      <p className="mt-6 text-center text-xs text-dust">Powerbuilding Training Manager 0.1.0 · 외부 분석·추적 스크립트 없음</p>
+    </div>
+  );
+};
