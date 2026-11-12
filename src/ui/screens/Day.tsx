@@ -632,7 +632,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, -1))} aria-label="전날"><ChevronLeft size={22} /></button>
         <div className="min-w-0 flex-1 text-center">
           <h1 className="text-[17px] leading-tight font-extrabold">{fmtDateKo(date)}{date === today ? ' 오늘' : ''}</h1>
-          <div className="num flex items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `계획 ${done}/${total}세트` : '계획 없음'}</span>{date !== today && <Chip className="!h-6 px-2 text-[11px]" onClick={() => onDate(today)}>오늘</Chip>}</div>
+          <div className="num flex h-5 items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `계획 ${done}/${total}세트` : '계획 없음'}</span>{date !== today && <button type="button" className="press relative inline-flex h-5 items-center rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</div>
         </div>
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, 1))} aria-label="다음 날"><ChevronRight size={22} /></button>
       </header>
