@@ -23,10 +23,10 @@ export const ModelLabScreen = () => {
   const k = db.exStates[sel.id]?.k ?? 1;
   return (
     <div>
-      <header><h1 className="text-xl font-extrabold">모델 실험실</h1><p className="text-sm text-dust">Top Set으로 예측한 Backoff가 실제로 몇 RPE였는지 비교해, 종목별 보정계수 k를 조금씩 맞춥니다.</p></header>
+      <header><h1 className="text-lg font-extrabold">모델 실험실</h1><p className="text-sm text-dust">Top Set으로 예측한 Backoff가 실제로 몇 RPE였는지 비교해, 종목별 보정계수 k를 조금씩 맞춥니다.</p></header>
 
       <SectionTitle>학습 설정</SectionTitle>
-      <div className="rounded-xl bg-steel px-4 py-2">
+      <div className="rounded-xl bg-steel px-3 py-1">
         <Row label="자동 학습"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="자동 학습" checked={s.emaEnabled} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { emaEnabled: e.target.checked }, ctx))} /></Row>
         <Row label="학습률 λ — SBD·딥스·풀업">
           <select className="field num w-24" value={s.ema.lambdaStrength} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { lambdaStrength: Number(e.target.value) }, ctx))}>{[0.05, 0.1, 0.15, 0.2, 0.3].map((n) => <option key={n} value={n}>{n}</option>)}</select>
@@ -45,7 +45,7 @@ export const ModelLabScreen = () => {
         {learnable.map((e) => <option key={e.id} value={e.id}>{e.name} — k {f3(db.exStates[e.id]?.k ?? 1)}</option>)}
       </select>
 
-      <div className="mt-2 rounded-xl bg-steel p-4">
+      <div className="mt-2 rounded-xl bg-steel p-3">
         <div className="flex items-end justify-between gap-2">
           <div><div className="text-xs text-dust">현재 보정계수 k</div><div className="num text-3xl font-extrabold">{f3(k)}</div></div>
           <div className="num text-right text-xs text-dust">λ {lambdaFor(db, sel.id)} · 유효 관측 {ev.n}건{!s.emaEnabled ? ' · 자동 학습 꺼짐' : ''}</div>

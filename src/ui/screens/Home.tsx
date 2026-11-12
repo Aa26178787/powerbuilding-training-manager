@@ -44,22 +44,22 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
   return (
     <div>
       <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-extrabold">{fmtDateKo(today)}</h1>
+        <h1 className="text-lg font-extrabold">{fmtDateKo(today)}</h1>
         <span className="text-xs text-dust">V1.9 Off-season Powerbuilding</span>
       </header>
 
-      <Btn kind="primary" className="mt-3 h-14 w-full text-base" onClick={() => go('day', session ? session.date : today)}>
+      <Btn kind="primary" className="mt-2 h-12 w-full text-base" onClick={() => go('day', session ? session.date : today)}>
         {session ? `${fmtDateKo(session.date)} 세션 이어서 기록` : todayGroups.length ? '오늘 운동 시작' : '오늘 화면 열기'}
       </Btn>
       {notStarted && <p className="mt-2 text-sm text-dust">프로그램은 {fmtDateKo(db.settings.programStart as string)}에 시작합니다.</p>}
       {todayGroups.length > 0 && (
-        <p className="mt-2 text-sm text-dust">{todayGroups.map((g) => g.instance.exerciseName).join(' → ')}</p>
+        <p className="mt-1.5 text-xs text-dust">{todayGroups.map((g) => g.instance.exerciseName).join(' → ')}</p>
       )}
 
-      <div className="mt-5 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between">
         <div className="flex shrink-0 rounded-lg border border-rail p-0.5 whitespace-nowrap" role="tablist" aria-label="기간">
           {(['week', 'month'] as const).map((m) => (
-            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`h-11 rounded-md px-4 text-sm font-semibold ${mode === m ? 'bg-rail' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
+            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`h-9 rounded-md px-3 text-[13px] font-semibold ${mode === m ? 'bg-rail' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
           ))}
         </div>
         <div className="flex items-center">
@@ -69,11 +69,11 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         </div>
       </div>
 
-      <button type="button" className="mt-2 flex w-full items-center gap-4 rounded-2xl bg-steel p-4 text-left" onClick={() => setDrill(true)} aria-label="달성률 상세 보기">
-        <PlateGauge pct={a.pb.original.pct} secondaryPct={a.pb.adjusted.pct} label="원본 계획 달성률" sub={a.pb.original.total ? `${a.pb.original.done}/${a.pb.original.total}세트` : '계획 없음'} size={168} />
+      <button type="button" className="mt-1.5 flex w-full items-center gap-3 rounded-xl bg-steel p-3 text-left" onClick={() => setDrill(true)} aria-label="달성률 상세 보기">
+        <PlateGauge pct={a.pb.original.pct} secondaryPct={a.pb.adjusted.pct} label="원본 계획 달성률" sub={a.pb.original.total ? `${a.pb.original.done}/${a.pb.original.total}세트` : '계획 없음'} size={136} />
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold">원본 계획 달성률</div>
-          <div className="num mt-2 space-y-1.5 text-[13px] whitespace-nowrap">
+          <div className="num mt-1.5 space-y-1 text-[13px] whitespace-nowrap">
             <div className="flex justify-between gap-2"><span className="text-dust"><span className="mr-1 inline-block h-2 w-2 rounded-full bg-p20" />조정 계획 이행률</span><b>{a.pb.adjusted.pct === null ? '—' : `${a.pb.adjusted.pct}%`}</b></div>
             <div className="flex justify-between gap-2"><span className="text-dust">기한 경과분 이행률</span><b>{a.pb.dueSoFar.pct === null ? '—' : `${a.pb.dueSoFar.pct}%`}</b></div>
             <div className="flex justify-between gap-2"><span className="text-dust">훈련 방문</span><b>{a.all.visits.actual}/{a.pb.visits.planned}일</b></div>
@@ -90,7 +90,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         {a.pb.addedSets > 0 && <Badge>추가 {a.pb.addedSets}세트</Badge>}
         {a.pb.extraSets > 0 && <Badge>계획 외 {a.pb.extraSets}세트</Badge>}
       </div>
-      <p className="mt-2 text-xs text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p>
+      <details className="mt-1"><summary className="flex h-8 cursor-pointer items-center text-[11px] text-dust">지표 설명</summary><p className="text-xs text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p></details>
 
       {fatigueReport(db).length > 0 && (
         <button type="button" className="mt-4 w-full rounded-xl border border-p15/60 p-3 text-left text-sm" onClick={() => go('analysis')}>
@@ -100,7 +100,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
       )}
 
       <SectionTitle>ARM SYSTEM</SectionTitle>
-      <div className="rounded-xl bg-steel px-4 py-1">
+      <div className="rounded-xl bg-steel px-3 py-0.5">
         {!db.arm ? (
           <Row label="데이터 없음"><button type="button" className="tap text-p20 underline" onClick={() => go('arm')}>ARM JSON 가져오기</button></Row>
         ) : (

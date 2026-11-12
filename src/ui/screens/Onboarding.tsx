@@ -41,7 +41,7 @@ export const Onboarding = () => {
         <input className="field num mt-1" type="number" inputMode="decimal" placeholder="예: 66.0" value={bw} onChange={(e) => setBw(e.target.value)} />
       </label>
       <div className="mt-3 text-xs text-dust">최근 기록 (중량·반복·RPE) — 입력 칸을 벗어나면 저장됩니다</div>
-      <div className="divide-y divide-rail rounded-xl bg-steel px-4">
+      <div className="divide-y divide-rail rounded-xl bg-steel px-3">
         {SEED_EXERCISES.map((id) => <SeedEditor key={id} db={db} exerciseId={id} compact />)}
       </div>
       <Btn kind="primary" className="mt-6 h-14 w-full text-base" onClick={begin}>{fmtDateKo(start)}부터 시작</Btn>

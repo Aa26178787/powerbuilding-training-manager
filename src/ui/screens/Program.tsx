@@ -80,7 +80,7 @@ export const ProgramScreen = () => {
 
   return (
     <div>
-      <header><h1 className="text-xl font-extrabold">프로그램</h1><p className="text-sm text-dust">{latest.name} · 버전 {latest.version}{current && current.id !== latest.id ? ` (이번 주는 버전 ${current.version} 적용 중)` : ''}</p></header>
+      <header><h1 className="text-lg font-extrabold">프로그램</h1><p className="text-sm text-dust">{latest.name} · 버전 {latest.version}{current && current.id !== latest.id ? ` (이번 주는 버전 ${current.version} 적용 중)` : ''}</p></header>
       <div className="mt-3 flex gap-1" role="tablist" aria-label="요일">
         {[1, 2, 3, 4, 5, 6, 7].map((n) => (
           <button key={n} type="button" role="tab" aria-selected={wd === n} onClick={() => setWd(n)} className={cx('h-11 flex-1 rounded-lg border text-sm font-bold', wd === n ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>{WEEKDAY_KO[n]}</button>

@@ -163,10 +163,10 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
   return (
     <div>
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-extrabold">캘린더</h1>
+        <h1 className="text-lg font-extrabold">캘린더</h1>
         <div className="flex shrink-0 rounded-lg border border-rail p-0.5 whitespace-nowrap" role="tablist" aria-label="보기">
           {(['week', 'month'] as const).map((m) => (
-            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`h-11 rounded-md px-4 text-sm font-semibold ${mode === m ? 'bg-rail' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
+            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`h-9 rounded-md px-3 text-[13px] font-semibold ${mode === m ? 'bg-rail' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
           ))}
         </div>
       </header>
@@ -179,14 +179,14 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
       </div>
 
       {mode === 'week' ? (
-        <ul className="mt-2 space-y-1.5">
+        <ul className="mt-1 space-y-1">
           {dates.map((d) => {
             const { sum, ids } = dayStatuses(d);
             const names = dayView(db, d).map((g) => g.instance.exerciseName);
             return (
               <li key={d}>
-                <button type="button" onClick={() => setSel(d)} className={cx('flex w-full items-start gap-3 rounded-xl bg-steel p-3 text-left', d === today && 'ring-1 ring-p15')}>
-                  <div className="num w-12 shrink-0 text-center"><div className="text-xs text-dust">{WEEKDAY_KO[weekdayOf(d)]}</div><div className="text-lg font-extrabold">{Number(d.slice(8))}</div></div>
+                <button type="button" onClick={() => setSel(d)} className={cx('flex w-full items-center gap-2.5 rounded-xl bg-steel px-2.5 py-2 text-left', d === today && 'ring-1 ring-p15')}>
+                  <div className="num w-9 shrink-0 text-center leading-tight"><div className="text-[11px] text-dust">{WEEKDAY_KO[weekdayOf(d)]}</div><div className="text-base font-extrabold">{Number(d.slice(8))}</div></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap gap-1">
                       {ids.map((id) => <Badge key={id} tone={tone(statuses.get(id) ?? 'planned')}>{db.workouts[id]?.track === 'arm' ? 'ARM ' : ''}{db.workouts[id]?.originalDate !== d ? `${fmtDateKo(db.workouts[id].originalDate)}분 ` : ''}{STATUS_LABEL[statuses.get(id) ?? 'planned']}</Badge>)}

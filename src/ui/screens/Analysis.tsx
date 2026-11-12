@@ -58,7 +58,7 @@ export const AnalysisScreen = () => {
 
   return (
     <div>
-      <header><h1 className="text-xl font-extrabold">분석</h1></header>
+      <header><h1 className="text-lg font-extrabold">분석</h1></header>
 
       {fatigue.length > 0 && (
         <>
@@ -74,7 +74,7 @@ export const AnalysisScreen = () => {
           <button type="button" className="num tap text-xs whitespace-nowrap" onClick={() => { setAnchor(today); setMode(mode === 'week' ? 'month' : 'week'); }}>{label} · {mode === 'week' ? '월간으로' : '주간으로'}</button>
           <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간">›</Btn>
         </div>}>근육군별 세트</SectionTitle>
-      <div className="rounded-xl bg-steel p-4">
+      <div className="rounded-xl bg-steel p-3">
         {vol.length === 0 ? <p className="text-sm text-dust">이 기간에 완료한 세트가 없습니다.</p>
           : <StackedBars names={['직접(주동근)', '간접(보조근 가중)']} rows={vol.map((v) => ({ label: MUSCLE_KO[v.muscle] ?? v.muscle, a: v.direct, b: v.indirect }))} />}
         <p className="mt-3 text-xs text-dust">실제로 완료한 세트만 셉니다(계획 외 세트 포함, ARM·워밍업 제외). 주동근 1.0·보조근 0.5는 추정 관리 지표입니다.</p>
@@ -86,7 +86,7 @@ export const AnalysisScreen = () => {
         {pbEx.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
         {Object.values(db.exercises).filter((e) => e.role === 'arm').map((e) => <option key={e.id} value={e.id}>ARM · {e.name}</option>)}
       </select>
-      <div className="mt-2 rounded-xl bg-steel p-4">
+      <div className="mt-2 rounded-xl bg-steel p-3">
         {trend.load.length === 0 ? <p className="text-sm text-dust">이 운동의 기록이 아직 없습니다.</p> : (
           <>
             {trend.hasE1rm && (
@@ -105,7 +105,7 @@ export const AnalysisScreen = () => {
       </div>
 
       <SectionTitle>주간 달성률 추이</SectionTitle>
-      <div className="rounded-xl bg-steel p-4">
+      <div className="rounded-xl bg-steel p-3">
         {weekly.length === 0 ? <Empty>계획이 있는 주가 아직 없습니다.</Empty> : (
           <LineChart title="주간 달성률 추이" unit="%" labels={weekly.map((w) => md(w.week))} series={[
             { name: '원본 계획', color: 'c1', values: weekly.map((w) => w.original) },

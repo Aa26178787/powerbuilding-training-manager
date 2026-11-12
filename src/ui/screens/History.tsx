@@ -30,7 +30,7 @@ export const HistoryScreen = () => {
   };
   return (
     <div>
-      <header><h1 className="text-xl font-extrabold">운동 기록</h1></header>
+      <header><h1 className="text-lg font-extrabold">운동 기록</h1></header>
       {used.length === 0 ? <div className="mt-4"><Empty>아직 기록이 없습니다. 오늘 화면에서 세트를 완료하면 여기에 쌓입니다.</Empty></div> : (
         <>
           <select className="field mt-3" value={sel} onChange={(e) => setExId(e.target.value)} aria-label="운동 선택">

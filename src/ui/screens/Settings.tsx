@@ -83,10 +83,10 @@ export const SettingsScreen = () => {
 
   return (
     <div>
-      <header><h1 className="text-xl font-extrabold">설정·데이터</h1></header>
+      <header><h1 className="text-lg font-extrabold">설정·데이터</h1></header>
 
       <SectionTitle>이 기기에서 쓰기</SectionTitle>
-      <div className="rounded-xl bg-steel px-4 py-2">
+      <div className="rounded-xl bg-steel px-3 py-1">
         <Row label="홈 화면 설치">
           {installed || isStandalone() ? <Badge tone="ok">설치됨</Badge>
             : canInstall ? <Btn kind="primary" onClick={async () => { if (await promptInstall()) { toast('홈 화면에 설치했습니다'); void requestPersist(); } }}>설치</Btn>
@@ -105,7 +105,7 @@ export const SettingsScreen = () => {
       </div>
 
       <SectionTitle>백업·복원</SectionTitle>
-      <div className="rounded-xl bg-steel p-4">
+      <div className="rounded-xl bg-steel p-3">
         <Row label="마지막 백업">{s.lastBackupAt ? new Date(s.lastBackupAt).toLocaleString('ko-KR', { timeZone: s.timezone }) : <Badge tone="warn">없음</Badge>}</Row>
         <Row label="브라우저 영구 저장">
           {persisted === true ? <Badge tone="ok">허용됨</Badge> : persisted === false ? <span className="flex items-center gap-2"><Badge tone="warn">허용 안 됨</Badge><Btn onClick={async () => toast((await requestPersist()) ? '영구 저장이 허용되었습니다' : '브라우저가 허용하지 않았습니다. 홈 화면에 앱을 추가하고 정기적으로 백업하세요')}>요청</Btn></span> : <Badge>이 브라우저는 지원하지 않음</Badge>}
@@ -140,7 +140,7 @@ export const SettingsScreen = () => {
       </div>
 
       <SectionTitle>프로필</SectionTitle>
-      <div className="rounded-xl bg-steel px-4 py-2">
+      <div className="rounded-xl bg-steel px-3 py-1">
         <Row label={`체중 (현재 ${s.bodyweight ?? '미입력'}kg)`}>
           <span className="flex gap-1.5"><input className="field num w-24 text-center" type="number" inputMode="decimal" value={bw} placeholder="kg" onChange={(e) => setBw(e.target.value)} /><Btn disabled={!bw} onClick={async () => { const n = Number(bw); if (!(n > 20 && n < 300)) { toast('체중 값을 확인하세요', 'error'); return; } const r = await run(() => ({ settings: { bodyweight: n } })); if (r.ok) setBw(''); }}>저장</Btn></span>
         </Row>
@@ -159,13 +159,13 @@ export const SettingsScreen = () => {
       </div>
 
       <SectionTitle>기준 기록 — 첫 중량 추천에 사용</SectionTitle>
-      <div className="divide-y divide-rail rounded-xl bg-steel px-4">
+      <div className="divide-y divide-rail rounded-xl bg-steel px-3">
         {SEED_EXERCISES.map((id) => <SeedEditor key={id} db={db} exerciseId={id} />)}
       </div>
       <p className="mt-1 text-xs text-dust">최근에 한 세트 하나(중량·반복·RPE)를 넣으면 보수적 e1RM으로 첫 Top Set을 제안합니다. 비워 두면 첫 세션에서 직접 입력합니다.</p>
 
       <SectionTitle>운동별 증량·반올림 단위</SectionTitle>
-      <div className="divide-y divide-rail rounded-xl bg-steel px-4">
+      <div className="divide-y divide-rail rounded-xl bg-steel px-3">
         {Object.values(db.exercises).filter((e) => e.role !== 'arm').map((e) => (
           <div key={e.id} className="flex min-h-[48px] items-center justify-between gap-2 py-1 text-sm">
             <span className="min-w-0 truncate">{e.name}</span>
@@ -180,7 +180,7 @@ export const SettingsScreen = () => {
       </div>
 
       <SectionTitle>프로그램 시작일</SectionTitle>
-      <div className="rounded-xl bg-steel p-4 text-sm">
+      <div className="rounded-xl bg-steel p-3 text-sm">
         <div>현재: <b className="num">{s.programStart ? `${s.programStart} ${fmtDateKo(s.programStart)}` : '미설정'}</b></div>
         {hasPbRecords ? <p className="mt-1 text-xs text-dust">기록이 있어서 시작일을 바꿀 수 없습니다.</p> : (
           <div className="mt-2 flex gap-1.5"><input className="field num flex-1" type="date" value={start} onChange={(e) => setStart(e.target.value)} /><Btn disabled={!isISODate(start)} onClick={changeStart}>변경</Btn></div>
@@ -188,7 +188,7 @@ export const SettingsScreen = () => {
       </div>
 
       <SectionTitle>계산 설정</SectionTitle>
-      <div className="rounded-xl bg-steel px-4 py-2">
+      <div className="rounded-xl bg-steel px-3 py-1">
         <Row label="세트 간 예상 RPE 상승폭">
           <select className="field num w-24" value={s.rpeDriftPerSet} onChange={(e) => void run(() => ({ settings: { rpeDriftPerSet: Number(e.target.value) } }))}>{[0, 0.25, 0.5, 0.75, 1].map((n) => <option key={n} value={n}>{n}</option>)}</select>
         </Row>

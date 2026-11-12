@@ -22,6 +22,11 @@ const FLAG_KO: Record<IssueFlag, string> = {
   merged_session: '병합 세션', other: '기타',
 };
 const TYPE_KO: Record<string, string> = { top: 'Top', backoff: 'Backoff', straight: '세트', volume: '세트', arm: '세트', arm_static: '버티기', extra: '추가', warmup: '워밍업' };
+/** 운동 역할 표시: 왼쪽 색 띠 + 글자(색만으로 구분하지 않음) */
+const ROLE: Record<string, { ko: string; color: string }> = {
+  comp: { ko: '주력', color: 'var(--color-p25)' }, strength: { ko: '스트렝스', color: 'var(--color-p20)' }, variation: { ko: '변형', color: 'var(--color-p15)' },
+  accessory: { ko: '보조', color: 'var(--color-knurl)' }, arm: { ko: 'ARM', color: 'var(--color-p10)' },
+};
 const SIDE_KO: Record<Side, string> = { L: '왼팔', R: '오른팔', both: '양팔' };
 
 const targetText = (s: PlannedSet): string => {
@@ -93,8 +98,8 @@ const RecordSheet = ({ t, onClose }: { t: EditTarget; onClose: () => void }) => 
 };
 
 const FlagPicker = ({ flags, onChange }: { flags: IssueFlag[]; onChange: (f: IssueFlag[]) => void }) => (
-  <details className="rounded-lg border border-rail px-3 py-1">
-    <summary className="tap flex cursor-pointer items-center text-sm text-dust">이상 태그{flags.length ? ` (${flags.map((f) => FLAG_KO[f]).join(', ')})` : ' — 장비 문제·통증 등'}</summary>
+  <details className="rounded-lg border border-rail px-2.5">
+    <summary className="flex h-9 cursor-pointer items-center text-xs text-dust">이상 태그{flags.length ? ` (${flags.map((f) => FLAG_KO[f]).join(', ')})` : ' — 장비 문제·통증 등'}</summary>
     <div className="flex flex-wrap gap-1.5 pb-2">
       {(Object.keys(FLAG_KO) as IssueFlag[]).map((f) => (
         <button key={f} type="button" aria-pressed={flags.includes(f)} onClick={() => onChange(flags.includes(f) ? flags.filter((x) => x !== f) : [...flags, f])}
@@ -152,8 +157,8 @@ const SetEntry = ({ db, g, set, date, sug, disabled }: { db: Db; g: DayGroupView
   };
 
   return (
-    <div className="mt-2 rounded-xl border border-p15/60 bg-iron p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
+    <div className="rounded-lg border border-p15/60 bg-iron p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="text-sm font-bold">{TYPE_KO[set.type]} {set.type === 'top' ? '' : `${g.sets.filter((s) => s.type === set.type).indexOf(set) + 1}`} <span className="font-normal text-dust">목표 {targetText(set)}</span></div>
         {set.track !== 'arm' && <span className="text-xs text-dust">상한 @{set.rpeCap}</span>}
       </div>
@@ -181,7 +186,7 @@ const SetEntry = ({ db, g, set, date, sug, disabled }: { db: Db; g: DayGroupView
           ))}
         </div>
       )}
-      <div className="space-y-2.5">
+      <div className="space-y-1.5">
         <Stepper label={g.exercise.loadMode === 'bodyweight_plus' ? '추가 중량' : '중량'} unit="kg" value={weight} onChange={setWeight} steps={inc === 2.5 ? [1.25, 2.5] : inc === 1.25 ? [1.25, 2.5] : [inc]} disabled={disabled} />
         {plates && <PlateChips perSide={plates.perSide} remainder={plates.remainder} />}
         {g.exercise.barbell && w !== null && lastHere.length === 0 && warmupPlan(w, db.settings.barWeight, inc).length > 1 && (
@@ -191,8 +196,8 @@ const SetEntry = ({ db, g, set, date, sug, disabled }: { db: Db; g: DayGroupView
         <RpePicker value={rpe} onChange={setRpe} cap={set.track === 'arm' ? undefined : set.rpeCap} disabled={disabled} />
         <FlagPicker flags={flags} onChange={setFlags} />
       </div>
-      <div className="mt-3 flex gap-2">
-        <Btn kind="primary" className="h-14 flex-1 text-base" onClick={complete} disabled={disabled || busy || reps === '' || (!isArm && weight === '')}>{isArm && side && side !== 'both' ? `${SIDE_KO[side]} 기록` : '세트 완료'}</Btn>
+      <div className="mt-2 flex gap-2">
+        <Btn kind="primary" className="h-12 flex-1 text-base" onClick={complete} disabled={disabled || busy || reps === '' || (!isArm && weight === '')}>{isArm && side && side !== 'both' ? `${SIDE_KO[side]} 기록` : '세트 완료'}</Btn>
         <Btn kind="quiet" onClick={() => void run((d, ctx) => skipSets(d, [set.id], false, '사용자 스킵', ctx))} disabled={disabled}>건너뛰기</Btn>
       </div>
       {!isArm && weight === '' && <p className="mt-1 text-xs text-dust">중량을 입력하면 완료할 수 있습니다{g.exercise.loadMode === 'bodyweight_plus' ? '(맨몸이면 0)' : ''}.</p>}
@@ -235,7 +240,7 @@ const ArmTable = ({ db, g, date, disabled, onEdit }: { db: Db; g: DayGroupView; 
   };
   const open = g.sets.filter((s) => s.status === 'planned');
   const cols = separate ? 'grid-cols-[1.6rem_1fr_1fr_3rem_3.6rem_3rem]' : 'grid-cols-[1.6rem_1fr_3rem_3.6rem_3rem]';
-  const inp = 'field num px-1 text-center';
+  const inp = 'field num px-1 text-center font-bold';
   return (
     <div className="mt-2">
       <div className={cx('grid items-center gap-1.5 text-[11px] text-dust', cols, !active && 'hidden')}>
@@ -259,13 +264,13 @@ const ArmTable = ({ db, g, date, disabled, onEdit }: { db: Db; g: DayGroupView; 
             );
           }
           return (
-            <li key={s.id} className="flex min-h-[44px] items-center gap-2 rounded-lg bg-steel px-2 text-sm [&>span:last-child]:self-center">
+            <li key={s.id} className="flex min-h-[38px] items-center gap-2 rounded-lg bg-iron px-2 text-sm [&>span:last-child]:self-center">
               <span className="num w-5 text-dust">{i + 1}</span>
               <span className="num flex-1">
                 {perf.length ? (
                   <span className="flex flex-wrap items-center gap-x-2">
                     {perf.map((p) => (
-                      <button key={p.id} type="button" className="inline-flex h-11 items-center underline decoration-rail underline-offset-4" onClick={() => onEdit({ perf: p, group: g, date })} aria-label={`${perfText(p)} 수정`}>
+                      <button key={p.id} type="button" className="inline-flex h-[38px] items-center underline decoration-rail underline-offset-4" onClick={() => onEdit({ perf: p, group: g, date })} aria-label={`${perfText(p)} 수정`}>
                         {p.side === 'L' ? '왼 ' : p.side === 'R' ? '오 ' : ''}{p.weight === null ? '중량 없음' : `${fmtKg(p.weight)}kg`}
                       </button>
                     ))}
@@ -327,15 +332,15 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, expanded, o
     if (r.ok) toast('1세트를 줄였습니다(원본 계획은 보존, 캘린더의 변경 이력에서 취소 가능)');
   };
   return (
-    <section className="py-4" aria-label={g.instance.exerciseName}>
+    <section className="rounded-xl bg-steel py-2.5 pr-3 pl-3" style={{ borderLeft: `4px solid ${ROLE[g.exercise.role]?.color ?? 'var(--color-knurl)'}` }} aria-label={g.instance.exerciseName}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[17px] leading-snug font-bold">{g.instance.exerciseName}</h3>
-          <div className="num mt-0.5 text-sm text-dust">{prescriptionText(g)}</div>
+          <h3 className="text-[15px] leading-snug font-bold">{g.instance.exerciseName}</h3>
+          <div className="num text-[13px] text-dust">{ROLE[g.exercise.role]?.ko} · {prescriptionText(g)}</div>
         </div>
-        <div className="num shrink-0 text-right text-sm font-bold">{doneCount}/{g.sets.length}<div className="text-xs font-normal text-dust">세트</div></div>
+        <div className={cx('num shrink-0 rounded-md px-1.5 py-0.5 text-sm font-bold', doneCount === g.sets.length && g.sets.length > 0 ? 'bg-p10/20 text-p10' : 'bg-iron')}>{doneCount}/{g.sets.length}</div>
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-1">
+      <div className="mt-1 flex flex-wrap gap-1 empty:hidden">
         {g.movedFrom && <Badge tone="info">{fmtDateKo(g.movedFrom)}에서 옮김</Badge>}
         {arm && <Badge>{g.workout.label.replace('ARM · ', '')}</Badge>}
         {arm?.rom && <Badge tone="info">{arm.rom}</Badge>}
@@ -348,7 +353,7 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, expanded, o
       {arm?.sourceText && <div className="mt-1 text-xs text-dust">PDF {arm.sourcePage}쪽 원문: {arm.sourceText}</div>}
       {video && <a className="mt-1 inline-block text-sm text-p20 underline" href={video.url} target="_blank" rel="noopener noreferrer">운동 영상 열기</a>}
       {history.length > 0 && (
-        <div className="num mt-1.5 text-xs text-dust">지난 기록 {fmtDateKo(history[0].sessionDate)}: {history.slice(0, 8).map(perfText).join(', ')}</div>
+        <div className="num mt-1 text-xs text-dust">지난 기록 {fmtDateKo(history[0].sessionDate)}: {history.slice(0, 8).map(perfText).join(', ')}</div>
       )}
       {dec && !arm && dec.reduceOptions && st.nextLoad === dec.nextLoad && (
         <div className="mt-2 rounded-lg border border-p15/50 p-2.5 text-sm">
@@ -361,16 +366,18 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, expanded, o
       )}
       {arm && g.sets.length === 0 && <ArmFill g={g} />}
       {arm && g.sets.length > 0 ? <ArmTable db={db} g={g} date={date} disabled={disabled} onEdit={onEdit} /> : (
-      <ul className="mt-2 space-y-1">
+      <ul className="mt-1.5 space-y-1">
         {g.sets.map((s, i) => {
           const perf = g.performed[s.id] ?? [];
           if (s.id === active?.id && expanded && sug) return <li key={s.id}><SetEntry db={db} g={g} set={s} date={date} sug={sug} disabled={disabled} /></li>;
+          // 접힌 카드에서는 아직 안 한 세트 줄을 숨겨 화면을 짧게 유지
+          if (!expanded && s.status === 'planned') return null;
           return (
-            <li key={s.id} className="flex min-h-[44px] items-center justify-between gap-2 rounded-lg bg-steel px-3">
+            <li key={s.id} className="flex min-h-[38px] items-center justify-between gap-2 rounded-lg bg-iron px-2.5 [&>span:last-child]:self-center">
               <span className="num w-20 shrink-0 text-xs text-dust">{TYPE_KO[s.type]} {s.type === 'top' ? '' : i + 1 - (g.sets[0].type === 'top' ? 1 : 0)}</span>
               <span className="num flex-1 text-sm">
                 {perf.length ? perf.map((p) => (
-                  <button key={p.id} type="button" className="tap mr-2 inline-flex items-center underline decoration-rail underline-offset-4" onClick={() => onEdit({ perf: p, group: g, date })}>{perfText(p)}</button>
+                  <button key={p.id} type="button" className="mr-2 inline-flex h-[38px] items-center underline decoration-rail underline-offset-4" onClick={() => onEdit({ perf: p, group: g, date })}>{perfText(p)}</button>
                 )) : <span className="text-dust">{targetText(s)}</span>}
               </span>
               {s.status === 'done' && <Badge tone="ok">완료</Badge>}
@@ -383,12 +390,12 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, expanded, o
       </ul>
       )}
       {g.extras.length > 0 && <div className="num mt-1 text-xs text-dust">계획 외: {g.extras.map((p) => <button key={p.id} type="button" className="mr-2 underline" onClick={() => onEdit({ perf: p, group: g, date })}>{perfText(p)}</button>)}</div>}
-      {active && !expanded && !arm && <Btn className="mt-2 w-full" onClick={onExpand}>이 운동 기록하기{sug?.load != null ? ` · 추천 ${fmtKg(sug.load)}kg` : ''}</Btn>}
+      {active && !expanded && !arm && <Btn className="mt-1.5 w-full" onClick={onExpand}>기록하기 · 남은 {g.sets.filter((x) => x.status === 'planned').length}세트{sug?.load != null ? ` · 추천 ${fmtKg(sug.load)}kg` : ''}</Btn>}
       {!active && dec && dec.instanceId === g.instance.id && !arm && (
         <div className="num mt-2 text-sm"><Badge tone={dec.action === 'increase' ? 'ok' : dec.action === 'hold' || dec.action === 'not_counted' ? 'mute' : 'warn'}>다음 세션 {fmtKg(st.nextLoad)}kg</Badge> <span className="text-dust">{dec.reason}</span></div>
       )}
-      <details className="mt-1">
-        <summary className="tap flex cursor-pointer items-center text-xs text-dust">운동 설정</summary>
+      <details>
+        <summary className="flex h-8 cursor-pointer items-center text-[11px] text-dust">운동 설정</summary>
         <div className="flex flex-wrap gap-1.5 pb-1">
           <Btn disabled={disabled || isFirst} onClick={() => void run((d) => reorderInstance(d, g.instance.id, date, -1))}>위로</Btn>
           <Btn disabled={disabled || isLast} onClick={() => void run((d) => reorderInstance(d, g.instance.id, date, 1))}>아래로</Btn>
@@ -436,8 +443,8 @@ const RestTimer = ({ since, target, onClose }: { since: string; target: number; 
   if (elapsed > 20 * 60) return null;
   const done = elapsed >= goal;
   return (
-    <div className="fixed inset-x-0 bottom-[72px] z-20 mx-auto flex max-w-[488px] items-center justify-between gap-2 rounded-xl border px-3 py-1.5 text-sm shadow-lg" role="timer"
-      style={{ marginInline: 'max(16px, calc(50% - 244px))', background: 'var(--color-steel)', borderColor: done ? 'var(--color-p10)' : 'var(--color-rail)' }}>
+    <div className="fixed inset-x-0 bottom-[60px] z-20 mx-auto flex max-w-[496px] items-center justify-between gap-2 rounded-xl border px-3 py-1 text-sm shadow-lg" role="timer"
+      style={{ marginInline: 'max(12px, calc(50% - 248px))', background: 'var(--color-rail)', borderColor: done ? 'var(--color-p10)' : 'var(--color-rail)' }}>
       <span className="num"><b className="text-lg">{mmss(elapsed)}</b> <span className="text-dust">/ 권장 {mmss(goal)}{done ? ' · 휴식 충분' : ''}</span></span>
       <span className="flex gap-1"><Btn onClick={() => setExtra(extra + 30)}>+30초</Btn><Btn kind="quiet" onClick={onClose}>닫기</Btn></span>
     </div>
@@ -451,6 +458,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
   const [bw, setBw] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [timerOff, setTimerOff] = useState<string | null>(null);
+  const [bwOpen, setBwOpen] = useState(false);
   useEffect(() => { ensureWeeksFor([date]); }, [date, db?.settings.programStart]);
   if (!db) return null;
   const today = todayStr();
@@ -492,12 +500,12 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       <header className="flex items-center justify-between gap-2">
         <Btn kind="quiet" onClick={() => onDate(addDays(date, -1))} aria-label="전날">‹</Btn>
         <div className="text-center">
-          <h1 className="text-xl font-extrabold">{fmtDateKo(date)}{date === today ? ' 오늘' : ''}</h1>
+          <h1 className="text-lg leading-tight font-extrabold">{fmtDateKo(date)}{date === today ? ' 오늘' : ''}</h1>
           <div className="num text-xs text-dust">{total ? `계획 ${done}/${total}세트` : '계획 없음'}</div>
         </div>
         <Btn kind="quiet" onClick={() => onDate(addDays(date, 1))} aria-label="다음 날">›</Btn>
       </header>
-      {date !== today && <div className="mt-1 text-center"><button type="button" className="tap text-sm text-p20 underline" onClick={() => onDate(today)}>오늘로 이동</button></div>}
+      {date !== today && <div className="text-center"><button type="button" className="h-8 text-xs text-p20 underline" onClick={() => onDate(today)}>오늘로 이동</button></div>}
 
       {session && !here && (
         <div className="mt-3 rounded-xl border border-p15/60 p-3 text-sm">
@@ -505,18 +513,23 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
           <div className="mt-2 flex gap-2"><Btn className="flex-1" onClick={() => onDate(session.date)}>진행 중 세션으로</Btn><Btn className="flex-1" onClick={finish}>세션 종료</Btn></div>
         </div>
       )}
-      {here && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-steel px-3 py-2 text-sm">
-          <span>세션 진행 중 <span className="num text-dust">· {new Date(here.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: db.settings.timezone })} 시작</span></span>
-          <Btn onClick={finish} disabled={readOnly}>세션 종료</Btn>
-        </div>
-      )}
-      {needsBw && (
-        <div className="mt-3 flex items-end gap-2 rounded-xl bg-steel px-3 py-2">
-          <label className="flex-1 text-xs text-dust">오늘 체중 (kg){curBw ? <span className="num"> · 현재 {curBw}</span> : <span className="text-p25"> · 딥스·풀업 계산에 필요</span>}
-            <input className="field num mt-1" type="number" inputMode="decimal" placeholder={curBw ? String(curBw) : '예: 66.0'} value={bw} onChange={(e) => setBw(e.target.value)} />
-          </label>
-          <Btn onClick={saveBw} disabled={!bw || blocked}>저장</Btn>
+      {(here || needsBw) && (
+        <div className="mt-1.5 rounded-xl bg-steel px-3 py-1 text-[13px]">
+          <div className="flex min-h-[42px] items-center justify-between gap-2">
+            <span className="num min-w-0 truncate">
+              {here ? <>세션 진행 중 <span className="text-dust">· {new Date(here.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: db.settings.timezone })} 시작</span></> : <span className="text-dust">세션 시작 전</span>}
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {needsBw && <button type="button" className={cx('num h-[42px] rounded-lg border px-2', curBw ? 'border-rail' : 'border-p25 text-p25')} aria-expanded={bwOpen} onClick={() => setBwOpen(!bwOpen)}>체중 {curBw ? `${curBw}kg` : '입력'}</button>}
+              {here && <Btn onClick={finish} disabled={readOnly}>세션 종료</Btn>}
+            </span>
+          </div>
+          {needsBw && (bwOpen || !curBw) && (
+            <div className="flex items-center gap-1.5 pb-1.5">
+              <input className="field num flex-1" type="number" inputMode="decimal" aria-label="오늘 체중 (kg)" placeholder={curBw ? `오늘 체중 (현재 ${curBw}kg)` : '오늘 체중 kg — 딥스·풀업 계산에 필요'} value={bw} onChange={(e) => setBw(e.target.value)} />
+              <Btn onClick={async () => { await saveBw(); setBwOpen(false); }} disabled={!bw || blocked}>저장</Btn>
+            </div>
+          )}
         </div>
       )}
 
@@ -528,10 +541,9 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       {groups.length === 0 && (
         <div className="mt-6"><Empty>{db.settings.programStart && date < db.settings.programStart ? `프로그램 시작일(${fmtDateKo(db.settings.programStart)}) 이전입니다.` : '이 날짜에 예정된 운동이 없습니다. 캘린더에서 다른 날의 운동을 옮겨 올 수 있습니다.'}</Empty></div>
       )}
-      <div className="mt-2">
+      <div className="mt-2 space-y-2">
         {groups.map((g, i) => (
           <div key={g.instance.id}>
-            {i > 0 && <div className="knurl" />}
             <GroupCard db={db} g={g} date={date} disabled={blocked} onEdit={setEdit} isFirst={i === 0} isLast={i === groups.length - 1} expanded={expandedId === g.instance.id} onExpand={() => setOpenId(g.instance.id)} />
           </div>
         ))}

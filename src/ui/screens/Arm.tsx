@@ -28,7 +28,7 @@ const Importer = ({ hasData }: { hasData: boolean }) => {
     setRes(parseArmJson(await f.text(), new Date().toISOString()));
   };
   return (
-    <div className="rounded-xl bg-steel p-4">
+    <div className="rounded-xl bg-steel p-3">
       <p className="text-sm">구매한 ARM SYSTEM의 추출 JSON 파일을 이 기기에서 직접 선택합니다. 파일은 이 브라우저 안에만 저장되고 앱 배포본에는 포함되지 않습니다.</p>
       <label className="mt-3 block">
         <span className="tap inline-flex cursor-pointer items-center rounded-[10px] border border-rail bg-iron px-4 text-[15px] font-semibold">{hasData ? '다른 JSON으로 교체' : 'ARM JSON 파일 선택'}</span>
@@ -90,7 +90,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
   if (!db.arm) {
     return (
       <div>
-        <header><h1 className="text-xl font-extrabold">ARM SYSTEM</h1></header>
+        <header><h1 className="text-lg font-extrabold">ARM SYSTEM</h1></header>
         <div className="mt-3"><Importer hasData={false} /></div>
       </div>
     );
@@ -134,10 +134,10 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
 
   return (
     <div>
-      <header><h1 className="text-xl font-extrabold">ARM SYSTEM</h1><p className="num text-sm text-dust">{arm.blockOrder.join(' → ')} · 전체 {days.length}일 중 {db.settings.armCursor}일 배정</p></header>
+      <header><h1 className="text-lg font-extrabold">ARM SYSTEM</h1><p className="num text-sm text-dust">{arm.blockOrder.join(' → ')} · 전체 {days.length}일 중 {db.settings.armCursor}일 배정</p></header>
 
       <SectionTitle>다음 Day 배정</SectionTitle>
-      <div className="rounded-xl bg-steel p-4">
+      <div className="rounded-xl bg-steel p-3">
         {next && weekPlan.length > 1 && (
           <div className="mb-4 border-b border-rail pb-4">
             <div className="text-sm font-bold">한 주 한 번에 배정</div>
@@ -171,7 +171,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
       </div>
 
       <SectionTitle>운영 방식</SectionTitle>
-      <div className="rounded-xl bg-steel px-4 py-2">
+      <div className="rounded-xl bg-steel px-3 py-1">
         <Row label="주간 횟수">
           <div className="flex gap-1">{([3, 2] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armMode === m} onClick={() => void run(() => ({ settings: { armMode: m } }))} className={cx('h-10 rounded-lg border px-3 font-semibold', db.settings.armMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>주 {m}일</button>)}</div>
         </Row>
@@ -261,7 +261,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
       {guide.length > 0 && (
         <>
           <SectionTitle>프로그램 가이드 (원본 PDF 명시사항)</SectionTitle>
-          <dl className="rounded-xl bg-steel px-4 py-2 text-sm">
+          <dl className="rounded-xl bg-steel px-3 py-1 text-sm">
             {guide.map(([k, v]) => <div key={k} className="flex justify-between gap-3 py-1.5"><dt className="shrink-0 text-dust">{GUIDE_KO[k] ?? k}</dt><dd className="text-right">{v}</dd></div>)}
           </dl>
           <p className="mt-1 text-xs text-dust">ARM은 PDF의 RPE를 그대로 따릅니다(RPE 9~9.5 포함). 일반 운동의 상한 @8을 적용하지 않으며, 통증·피로가 있으면 직접 낮춰서 수행하세요.</p>

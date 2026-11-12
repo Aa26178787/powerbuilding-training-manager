@@ -11,7 +11,7 @@ export const Btn = ({ kind = 'ghost', className, ...p }: React.ButtonHTMLAttribu
     type="button"
     {...p}
     className={cx(
-      'tap inline-flex items-center justify-center gap-1.5 rounded-[10px] px-4 text-[15px] font-semibold select-none',
+      'inline-flex min-h-[42px] min-w-[42px] items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold select-none',
       kind === 'primary' && 'bg-p15 text-[#1b1608]',
       kind === 'ghost' && 'border border-rail bg-steel',
       kind === 'quiet' && 'text-dust',
@@ -53,7 +53,7 @@ export const PlateGauge = ({ pct, label, sub, secondaryPct, size = 200 }: { pct:
         )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className="num text-[40px] leading-none font-extrabold">{pct === null ? '—' : pct}<span className="text-lg font-bold">{pct === null ? '' : '%'}</span></div>
+        <div className="num leading-none font-extrabold" style={{ fontSize: size * 0.21 }}>{pct === null ? '—' : pct}<span className="text-sm font-bold">{pct === null ? '' : '%'}</span></div>
         <div className="num mt-1 text-xs text-dust">{sub}</div>
       </div>
     </div>
@@ -114,17 +114,17 @@ export const Stepper = ({ label, value, onChange, steps, min = 0, unit, decimal 
   };
   return (
     <label className="block">
-      <span className="mb-1 block text-xs text-dust">{label}{unit ? ` (${unit})` : ''}</span>
+      <span className="mb-0.5 block text-[11px] text-dust">{label}{unit ? ` (${unit})` : ''}</span>
       <div className="flex items-stretch gap-1">
         {steps.slice().reverse().map((s) => (
-          <button key={`m${s}`} type="button" disabled={disabled} onClick={() => bump(-s)} className="tap num rounded-lg border border-rail px-1.5 text-sm text-dust" aria-label={`${label} ${s} 줄이기`}>−{s}</button>
+          <button key={`m${s}`} type="button" disabled={disabled} onClick={() => bump(-s)} className="num min-h-[42px] min-w-[40px] rounded-lg border border-rail px-1 text-[13px] text-dust" aria-label={`${label} ${s} 줄이기`}>−{s}</button>
         ))}
         <input
-          className="field num min-w-0 flex-1 text-center text-xl font-bold" type="number" inputMode={decimal ? 'decimal' : 'numeric'} step="any" min={min}
+          className="field num min-w-0 flex-1 text-center text-lg font-bold" type="number" inputMode={decimal ? 'decimal' : 'numeric'} step="any" min={min}
           value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} onFocus={(e) => e.target.select()}
         />
         {steps.map((s) => (
-          <button key={`p${s}`} type="button" disabled={disabled} onClick={() => bump(s)} className="tap num rounded-lg border border-rail px-1.5 text-sm text-dust" aria-label={`${label} ${s} 늘리기`}>+{s}</button>
+          <button key={`p${s}`} type="button" disabled={disabled} onClick={() => bump(s)} className="num min-h-[42px] min-w-[40px] rounded-lg border border-rail px-1 text-[13px] text-dust" aria-label={`${label} ${s} 늘리기`}>+{s}</button>
         ))}
       </div>
     </label>
@@ -135,16 +135,16 @@ const RPES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 /** RPE 선택(0.5 단위). 상한을 넘는 값은 글자로도 표시한다 */
 export const RpePicker = ({ value, onChange, cap, disabled }: { value: number | null; onChange: (v: number | null) => void; cap?: number; disabled?: boolean }) => (
   <div>
-    <div className="mb-1 flex items-baseline justify-between text-xs text-dust">
+    <div className="mb-0.5 flex items-baseline justify-between text-[11px] text-dust">
       <span>실제 RPE</span>
       {value !== null && cap !== undefined && value > cap && <span className="font-semibold text-p25">상한 @{cap} 초과</span>}
     </div>
-    <div className="grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="실제 RPE">
+    <div className="grid grid-cols-9 gap-1" role="radiogroup" aria-label="실제 RPE">
       {RPES.map((r) => (
         <button
           key={r} type="button" role="radio" aria-checked={value === r} disabled={disabled}
           onClick={() => onChange(value === r ? null : r)}
-          className={cx('num h-11 rounded-lg border text-base font-bold', value === r ? (cap !== undefined && r > cap ? 'border-p25 bg-p25 text-white' : 'border-p15 bg-p15 text-[#1b1608]') : 'border-rail text-dust')}
+          className={cx('num h-[42px] rounded-lg border text-[13px] font-bold', value === r ? (cap !== undefined && r > cap ? 'border-p25 bg-p25 text-white' : 'border-p15 bg-p15 text-[#1b1608]') : 'border-rail text-dust')}
         >{r}</button>
       ))}
     </div>
@@ -165,19 +165,19 @@ export const PlateChips = ({ perSide, remainder }: { perSide: number[]; remainde
 );
 
 export const Row = ({ label, children }: { label: ReactNode; children: ReactNode }) => (
-  <div className="flex min-h-[44px] items-center justify-between gap-3 py-1.5">
+  <div className="flex min-h-[42px] items-center justify-between gap-3 py-1">
     <div className="text-sm text-dust">{label}</div>
     <div className="text-right text-sm">{children}</div>
   </div>
 );
 
 export const SectionTitle = ({ children, right }: { children: ReactNode; right?: ReactNode }) => (
-  <div className="mt-6 mb-2 flex items-end justify-between gap-2">
-    <h2 className="text-[13px] font-bold text-dust">{children}</h2>
+  <div className="mt-4 mb-1.5 flex items-end justify-between gap-2">
+    <h2 className="text-xs font-bold text-dust">{children}</h2>
     {right}
   </div>
 );
 
 export const Empty = ({ children }: { children: ReactNode }) => (
-  <div className="rounded-xl border border-dashed border-rail px-4 py-6 text-center text-sm text-dust">{children}</div>
+  <div className="rounded-xl border border-dashed border-rail px-3 py-4 text-center text-sm text-dust">{children}</div>
 );

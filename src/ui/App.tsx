@@ -84,14 +84,14 @@ export const App = () => {
 
   return (
     <div className="mx-auto flex min-h-full max-w-[520px] flex-col">
-      <div className="num flex items-center justify-between px-4 pt-2 text-[11px] text-dust" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }} aria-live="polite">
+      <div className="num flex items-center justify-between px-3 text-[10px] text-dust" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }} aria-live="polite">
         <span>{!online ? '오프라인 — 기록은 이 기기에 저장됩니다' : ''}</span>
         <span className={cx(save === 'error' && 'font-bold text-p25')}>{save === 'saving' ? '저장 중…' : save === 'saved' ? '이 기기에 저장됨' : save === 'error' ? '저장 실패 — 다시 시도하세요' : ''}</span>
       </div>
       {import.meta.env.VITE_PREVIEW && <div className="mx-4 mt-1 rounded-lg border border-p20/60 px-3 py-2 text-xs">미리보기 화면입니다. 기록은 이 브라우저에만 임시로 남고, 설치·오프라인·백업 파일 저장은 실제 배포본에서 동작합니다.</div>}
       {memoryOnly && <div className="mx-4 mt-1 rounded-lg border border-p25/60 px-3 py-2 text-sm">이 환경에서는 저장소를 쓸 수 없어 기록이 저장되지 않습니다. 새로고침하면 사라집니다.</div>}
       {readOnly && <div className="mx-4 mt-1 rounded-lg border border-p15/60 px-3 py-2 text-sm">다른 탭에서 이 앱을 쓰는 중이라 이 탭은 읽기 전용입니다. 그 탭을 닫으면 여기서 기록할 수 있습니다.</div>}
-      <main className="flex-1 px-4 pt-2 pb-28">
+      <main className="flex-1 px-3 pt-1 pb-24">
         {tab === 'home' && <HomeScreen go={go} />}
         {tab === 'day' && <DayScreen date={date} onDate={setDate} />}
         {tab === 'calendar' && <CalendarScreen go={go} />}
@@ -120,8 +120,8 @@ export const App = () => {
         </Sheet>
       )}
       {toast && (
-        <div className="fixed inset-x-0 bottom-20 z-50 mx-auto flex max-w-[488px] items-center justify-between gap-3 rounded-xl px-4 py-2 text-sm shadow-lg" role="status"
-          style={{ background: toast.kind === 'error' ? 'var(--color-p25)' : 'var(--color-chalk)', color: toast.kind === 'error' ? '#fff' : 'var(--color-iron)', marginInline: 'max(16px, calc(50% - 244px))' }}>
+        <div className="fixed inset-x-0 bottom-[64px] z-50 mx-auto flex max-w-[496px] items-center justify-between gap-3 rounded-xl px-3 py-1 text-sm shadow-lg" role="status"
+          style={{ background: toast.kind === 'error' ? 'var(--color-p25)' : 'var(--color-chalk)', color: toast.kind === 'error' ? '#fff' : 'var(--color-iron)', marginInline: 'max(12px, calc(50% - 248px))' }}>
           <span>{toast.text}</span>
           {toast.action ? <Btn kind="quiet" className="shrink-0 !text-inherit underline" onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</Btn>
             : <button type="button" className="tap shrink-0 text-xs underline" onClick={dismissToast}>닫기</button>}
@@ -130,7 +130,7 @@ export const App = () => {
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-rail bg-iron/95 backdrop-blur" aria-label="주요 메뉴" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mx-auto grid max-w-[520px] grid-cols-5">
           {NAV.map(([t, l]) => (
-            <button key={t} type="button" aria-current={active === t ? 'page' : undefined} onClick={() => go(t)} className={cx('relative h-16 text-sm font-bold', active === t ? 'text-chalk' : 'text-dust')}>
+            <button key={t} type="button" aria-current={active === t ? 'page' : undefined} onClick={() => go(t)} className={cx('relative h-14 text-[13px] font-bold', active === t ? 'text-chalk' : 'text-dust')}>
               {active === t && <span className="absolute inset-x-5 top-0 h-[3px] rounded-b bg-p15" aria-hidden />}
               {l}
             </button>
