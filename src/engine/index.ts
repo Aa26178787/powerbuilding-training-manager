@@ -9,4 +9,3 @@ export * from './status';
 export * from './scheduleMerge';
 export * from './muscleVolume';
 export * from './fatigue';
-export * from './warmup';

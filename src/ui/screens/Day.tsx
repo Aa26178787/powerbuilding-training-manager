@@ -7,7 +7,6 @@ import { Check, ChevronLeft, ChevronRight, Ellipsis, Flag, Minus, Play, Plus, Sk
 import type { Db, ISODate, IssueFlag, PerformedSet, PlannedSet, Side } from '../../domain/types';
 import { addDays, fmtDateKo, weekdayOf } from '../../engine/dates';
 import { plateBreakdown } from '../../engine/rounding';
-import { warmupPlan } from '../../engine/warmup';
 import { dayView, DayGroupView } from '../../application/selectors';
 import { armVariantKey, lastSessionSets, suggestForSet, Suggestion } from '../../application/recommend';
 import {
@@ -274,7 +273,6 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
   }, [active?.id, sug?.load]);
   const w = weight === '' ? null : Number(weight);
   const plates = g.exercise.barbell && w !== null && w > 0 ? plateBreakdown(w, db.settings.barWeight, db.settings.plates, db.settings.plateStock) : null;
-  const warm = g.exercise.barbell && w !== null && doneHere.length === 0 ? warmupPlan(w, db.settings.barWeight, inc) : [];
   const open = g.sets.filter((s) => s.status === 'planned');
   const bumpW = (d: number) => setWeight(String(Math.max(0, Math.round(((Number(weight) || 0) + d) * 1000) / 1000)));
   const bumpR = (d: number) => setReps(String(Math.max(0, (Number(reps) || 0) + d)));
@@ -326,7 +324,6 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
             <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}><SkipForward size={13} aria-hidden />이 세트 건너뛰기</Chip>
           </div>
           {showFlags && <Reveal className="mt-2"><FlagPicker flags={flags} onChange={setFlags} /></Reveal>}
-          {warm.length > 1 && <div className="num mt-2.5 text-[12px] text-dust">워밍업 <span className="num-d text-[14px] text-chalk/80">{warm.map((x) => `${fmtKg(x.load)}×${x.reps}`).join(', ')}</span></div>}
         </div>
       )}
       <SetStrip g={g} date={date} activeId={focused ? active?.id : undefined} onEdit={onEdit} labelOf={labelOf} valueOf={(perf) => short(perf[0])} />

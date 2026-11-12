@@ -64,7 +64,7 @@ export const suggestForSet = (db: Db, set: PlannedSet, sessionDate: ISODate): Su
 
   if (set.type === 'top') {
     if (st?.nextLoad != null) return { load: st.nextLoad, kind: 'progression', message: st.lastDecision?.reason ?? '지난 세션 기준 추천' };
-    return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록이 없습니다. 워밍업하며 중량을 정하세요' };
+    return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록이 없습니다. 첫 세트에서 중량을 정하세요' };
   }
   if (set.type === 'backoff') {
     const top = done.find((p) => p.type === 'top');
@@ -89,7 +89,7 @@ export const suggestForSet = (db: Db, set: PlannedSet, sessionDate: ISODate): Su
     return { load: a.load, kind: 'next_set', message: a.reason, offerStop: a.offerStop, action: a.action, detail: { ...a } };
   }
   if (st?.nextLoad != null) return { load: st.nextLoad, kind: 'progression', message: st.lastDecision?.reason ?? '지난 세션 기준 추천' };
-  if (set.type === 'straight') return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록이 없습니다. 워밍업하며 중량을 정하세요' };
+  if (set.type === 'straight') return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록이 없습니다. 첫 세트에서 중량을 정하세요' };
   if (ex.variationOf) {
     const comp = latestE1rm(db, ex.variationOf.compExerciseId);
     if (comp !== null) {

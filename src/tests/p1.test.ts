@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Db, PlannedSet } from '../domain/types';
 import { DEFAULT_MUSCLES } from '../domain/defaults';
-import { calculateWeightedMuscleSets, evaluateCoefficients, fatigueSignals, predictRpe, warmupPlan, conservativeE1RM, impliedE1RM, loadForTarget } from '../engine';
+import { calculateWeightedMuscleSets, evaluateCoefficients, fatigueSignals, predictRpe, conservativeE1RM, impliedE1RM, loadForTarget } from '../engine';
 import { recordSet, editPerformedSet, recordArmRow } from '../application/session';
 import { assignArmDays, suggestArmDates } from '../application/arm';
 import { parseArmJson } from '../data-import/armImport';
@@ -129,7 +129,7 @@ describe('근육군 가중 세트 (FR-080)', () => {
   });
 });
 
-describe('추세·피로·워밍업·CSV', () => {
+describe('추세·피로·CSV', () => {
   it('운동별 e1RM 추세', () => {
     let { db } = squatSession(makeDb(), START, 150, 8, 7);
     db = squatSession(db, '2026-12-07', 152.5, 8, 7).db;
@@ -143,12 +143,6 @@ describe('추세·피로·워밍업·CSV', () => {
     expect(fatigueSignals([s('1', 150, 8, 7.5), s('2', 150, 8.5, 7.8), s('3', 150, 9, 8.3)], 'SQ').map((x) => x.code)).toEqual(['over_cap_repeat', 'rpe_creep']);
     expect(fatigueSignals([s('1', 150, 8, 7.5), s('2', 152.5, 8, 7.5), s('3', 155, 8, 7.5)], 'SQ')).toEqual([]);
     expect(fatigueSignals([s('1', 150, 9, 8)], 'SQ')).toEqual([]);
-  });
-  it('워밍업 단계: 작업 중량 미만, 오름차순', () => {
-    const w = warmupPlan(150, 20, 2.5);
-    expect(w.map((x) => x.load)).toEqual([20, 60, 90, 112.5, 132.5]);
-    expect(warmupPlan(20, 20, 2.5)).toEqual([]);
-    expect(warmupPlan(40, 20, 2.5).every((x) => x.load < 40)).toBe(true);
   });
   it('CSV: 수식 주입 방지·이스케이프', () => {
     let db = makeDb();

@@ -78,7 +78,7 @@ export const AnalysisScreen = () => {
       <div className="rounded-xl bg-steel p-3">
         {vol.length === 0 ? <p className="text-sm text-dust">이 기간에 완료한 세트가 없습니다.</p>
           : <StackedBars names={['직접(주동근)', '간접(보조근 가중)']} rows={vol.map((v) => ({ label: MUSCLE_KO[v.muscle] ?? v.muscle, a: v.direct, b: v.indirect }))} />}
-        <p className="mt-3 text-xs text-dust">실제로 완료한 세트만 셉니다(계획 외 세트 포함, ARM·워밍업 제외). 주동근 1.0·보조근 0.5는 추정 관리 지표입니다.</p>
+        <p className="mt-3 text-xs text-dust">실제로 완료한 세트만 셉니다(계획 외 세트 포함, ARM 제외). 주동근 1.0·보조근 0.5는 추정 관리 지표입니다.</p>
         <Row label="SBD·Strength 계획 세트">{sbd.original.total ? `${sbd.original.done}/${sbd.original.total}세트 (${sbd.original.pct}%)` : '계획 없음'}</Row>
       </div>
 
