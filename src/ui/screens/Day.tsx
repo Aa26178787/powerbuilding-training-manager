@@ -639,8 +639,8 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       <header className="flex items-center gap-1">
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, -1))} aria-label="전날"><ChevronLeft size={22} /></button>
         <div className="min-w-0 flex-1 text-center">
-          <h1 className="text-[16px] leading-5 font-bold">{fmtDateKo(date)}</h1>
-          <div className="num flex h-5 items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `${date === today ? '오늘, ' : ''}${total}세트 중 ${done}세트` : '계획 없음'}</span>{date !== today && <button type="button" className="press relative inline-flex h-5 items-center rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</div>
+          <div className="flex items-center justify-center gap-2"><h1 className="text-[16px] leading-5 font-bold">{fmtDateKo(date)}</h1>{date !== today && <button type="button" className="press relative inline-flex h-5 items-center rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</div>
+          <div className="num flex h-5 items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `${date === today ? '오늘, ' : ''}${total}세트 중 ${done}세트` : '계획 없음'}</span></div>
         </div>
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, 1))} aria-label="다음 날"><ChevronRight size={22} /></button>
       </header>
