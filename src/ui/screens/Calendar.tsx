@@ -70,7 +70,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
           {action !== 'swap' && (
             <fieldset>
               <legend className="mb-1 text-xs font-bold text-dust">대상 운동 — 일부만 고르면 세션이 분할됩니다</legend>
-              <div className="divide-y divide-rail rounded-lg border border-rail">
+              <div className="divide-y divide-rail overflow-hidden rounded-lg bg-deck">
                 {groups.map((g) => (
                   <label key={g.instance.id} className="flex min-h-[44px] cursor-pointer items-center gap-3 px-3 text-sm">
                     <input type="checkbox" className="h-5 w-5 accent-[var(--color-p15)]" checked={picked.includes(g.instance.id)} onChange={(e) => setPicked(e.target.checked ? [...picked, g.instance.id] : picked.filter((x) => x !== g.instance.id))} />
@@ -99,7 +99,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
 
           {preview && !preview.ok && <div className="rounded-lg bg-p25/15 p-3 text-sm">{preview.errors.join(' / ')}</div>}
           {preview?.ok && (
-            <div className="rounded-xl bg-iron p-3">
+            <div className="rounded-xl bg-deck p-3">
               <div className="text-sm font-bold">미리보기 — {preview.summary}</div>
               <div className="num mt-1 text-xs text-dust">이동 {preview.counts.moved} · 면제 {preview.counts.excused} · 삭제 {preview.counts.removed}세트. 원본 계획과 달성률 분모는 그대로 보존됩니다{preview.counts.excused + preview.counts.removed > 0 ? '(조정 계획 이행률의 분모만 줄어듭니다)' : ''}.</div>
               {preview.affected.map((a) => (
@@ -164,9 +164,9 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
     <div>
       <header className="flex items-center justify-between">
         <h1 className="text-lg font-extrabold">캘린더</h1>
-        <div className="flex shrink-0 rounded-lg border border-rail p-0.5 whitespace-nowrap" role="tablist" aria-label="보기">
+        <div className="flex shrink-0 rounded-lg bg-steel p-0.5 whitespace-nowrap" role="tablist" aria-label="보기">
           {(['week', 'month'] as const).map((m) => (
-            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`h-9 rounded-md px-3 text-[13px] font-semibold ${mode === m ? 'bg-rail' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
+            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`press h-9 rounded-md px-3 text-[13px] font-semibold ${mode === m ? 'bg-deck text-chalk' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
           ))}
         </div>
       </header>
@@ -186,7 +186,7 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
             return (
               <li key={d}>
                 <button type="button" onClick={() => setSel(d)} className={cx('flex w-full items-center gap-2.5 rounded-xl bg-steel px-2.5 py-2 text-left', d === today && 'ring-1 ring-p15')}>
-                  <div className="num w-9 shrink-0 text-center leading-tight"><div className="text-[11px] text-dust">{WEEKDAY_KO[weekdayOf(d)]}</div><div className="text-base font-extrabold">{Number(d.slice(8))}</div></div>
+                  <div className="num w-9 shrink-0 text-center leading-tight"><div className="text-[11px] text-dust">{WEEKDAY_KO[weekdayOf(d)]}</div><div className="num-d text-[20px] leading-none">{Number(d.slice(8))}</div></div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap gap-1">
                       {ids.map((id) => <Badge key={id} tone={tone(statuses.get(id) ?? 'planned')}>{db.workouts[id]?.track === 'arm' ? 'ARM ' : ''}{db.workouts[id]?.originalDate !== d ? `${fmtDateKo(db.workouts[id].originalDate)}분 ` : ''}{STATUS_LABEL[statuses.get(id) ?? 'planned']}</Badge>)}
@@ -195,7 +195,7 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
                     </div>
                     {names.length > 0 && <div className="mt-1 truncate text-xs text-dust">{names.join(', ')}</div>}
                   </div>
-                  {sum.total > 0 && <div className="num shrink-0 text-sm font-bold">{sum.done}/{sum.total}</div>}
+                  {sum.total > 0 && <div className={cx('num-d shrink-0 text-[16px]', sum.done === sum.total ? 'text-p10' : 'text-dust')}>{sum.done}/{sum.total}</div>}
                 </button>
               </li>
             );
@@ -245,7 +245,7 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
               const w = db.workouts[id];
               const st = statuses.get(id) ?? 'planned';
               return (
-                <div key={id} className="rounded-lg bg-iron p-3 text-sm">
+                <div key={id} className="rounded-lg bg-deck p-3 text-sm">
                   <div className="flex items-center justify-between gap-2"><b>{w.label}{w.originalDate !== sel ? ` (원래 ${fmtDateKo(w.originalDate)})` : ''}</b><Badge tone={tone(st)}>{STATUS_LABEL[st]}</Badge></div>
                   {st === 'overdue' && (
                     <div className="mt-2 flex gap-2">

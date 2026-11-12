@@ -1,7 +1,7 @@
 // 개인화 계수 학습 유스케이스: 세션 기록에서 관측을 만들고, 관측 기록을 재생해 k를 갱신한다.
 import type { CoefficientRecord, Db, ExerciseState, Patch } from '../domain/types';
 import { evaluateCoefficients, CoeffEvaluation } from '../engine/coefficient';
-import { conservativeE1RM, validateSetInput } from '../engine/e1rm';
+import { conservativeE1RM, validateSetInput, FORMULA_VERSION } from '../engine/e1rm';
 import { Ctx, fail } from './ctx';
 import { latestE1rm, livePerformed } from './recommend';
 
@@ -94,4 +94,26 @@ export const updateLearningSettings = (db: Db, s: Partial<Db['settings']['ema']>
   const next: Db = { ...db, settings: { ...db.settings, ema, emaEnabled: enabled } };
   const ids = [...new Set(Object.values(db.coeffs).map((r) => r.exerciseId))];
   return { settings: { ema, emaEnabled: enabled }, ...(enabled ? { put: { exStates: ids.map((id) => withK(db, id, coefficientEvaluation(next, id).k, ctx)) } } : {}) };
+};
+
+/**
+ * e1RM 공식이 바뀐 뒤 처음 열 때: 수행 기록에서 관측을 다시 만들고 모든 종목의 k를 다시 계산한다.
+ * 수행 기록·사용자 포함/제외 지정·수동 지정/초기화 기록은 그대로 둔다.
+ */
+export const migrateFormula = (db: Db, ctx: Ctx): Patch | null => {
+  if (db.settings.formulaVersion === FORMULA_VERSION) return null;
+  const rebuilt: CoefficientRecord[] = [];
+  const dropped: string[] = [];
+  for (const r of Object.values(db.coeffs)) {
+    if (r.kind !== 'observation' || !r.instanceId) continue;
+    const n = buildObservation(db, r.instanceId, ctx);
+    if (n) rebuilt.push({ ...n, at: r.at, override: r.override ?? null }); else dropped.push(r.id);
+  }
+  const next: Db = { ...db, coeffs: { ...Object.fromEntries(Object.entries(db.coeffs).filter(([id]) => !dropped.includes(id))), ...Object.fromEntries(rebuilt.map((r) => [r.id, r])) } };
+  const ids = [...new Set(Object.values(next.coeffs).map((r) => r.exerciseId))];
+  return {
+    put: { coeffs: rebuilt, ...(db.settings.emaEnabled && ids.length ? { exStates: ids.map((id) => withK(db, id, coefficientEvaluation(next, id).k, ctx)) } : {}) },
+    ...(dropped.length ? { del: { coeffs: dropped } } : {}),
+    settings: { formulaVersion: FORMULA_VERSION },
+  };
 };

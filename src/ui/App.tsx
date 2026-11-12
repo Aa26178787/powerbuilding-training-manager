@@ -1,5 +1,7 @@
 // 앱 셸: 하단 탭, 저장 상태 표시, 알림
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { BicepsFlexed, CalendarDays, ChartLine, ChevronRight, Dumbbell, Ellipsis, FlaskConical, History, House, ListChecks, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
 import type { ISODate } from '../domain/types';
 import { dismissToast, toast as showToast, todayStr, useApp } from './store';
 import { Btn, closeTopSheet, cx, Sheet } from './components';
@@ -16,7 +18,21 @@ import { ModelLabScreen } from './screens/ModelLab';
 import { Onboarding } from './screens/Onboarding';
 
 type Tab = 'home' | 'day' | 'calendar' | 'arm' | 'more' | 'program' | 'history' | 'settings' | 'analysis' | 'lab';
-const NAV: [Tab, string][] = [['home', '홈'], ['day', '오늘'], ['calendar', '캘린더'], ['arm', 'ARM'], ['more', '더보기']];
+const NAV: [Tab, string, LucideIcon][] = [['home', '홈', House], ['day', '오늘', Dumbbell], ['calendar', '캘린더', CalendarDays], ['arm', 'ARM', BicepsFlexed], ['more', '더보기', Ellipsis]];
+const MORE: [Tab, string, string, LucideIcon][] = [
+  ['program', '프로그램 조회·편집', '요일별 운동, 세트·반복·RPE', ListChecks],
+  ['history', '운동 기록', '운동별 이력, 수정·삭제·복원', History],
+  ['analysis', '분석', '근육군별 세트, 추세 그래프, 피로 신호', ChartLine],
+  ['lab', '모델 실험실', '개인화 계수, 예측 오차, RTS RPE 표', FlaskConical],
+  ['settings', '설정·데이터', '백업·복원, 체중, 원판, 증량 단위', SettingsIcon],
+];
+
+/** 탭 전환을 View Transition으로 감싼다(지원 브라우저 + 동작 줄이기 꺼짐일 때만, 아니면 즉시 전환) */
+const withTransition = (update: () => void) => {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+  if (!doc.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { update(); return; }
+  doc.startViewTransition(() => flushSync(update));
+};
 
 export const App = () => {
   const { db, save, readOnly, toast, fatal, memoryOnly, confirm } = useApp();
@@ -76,9 +92,11 @@ export const App = () => {
   if (!db.settings.onboardingDone) return <Onboarding />;
 
   const go = (t: string, d?: ISODate) => {
-    if (d) setDate(d); else if (t === 'day') setDate(todayStr());
     if (t !== tab) { trail.current = [...trail.current.filter((x) => x !== t), tab].slice(-6); if (t === 'home') trail.current = []; }
-    setTab(t as Tab);
+    withTransition(() => {
+      if (d) setDate(d); else if (t === 'day') setDate(todayStr());
+      setTab(t as Tab);
+    });
   };
   const active: Tab = ['program', 'history', 'settings', 'analysis', 'lab'].includes(tab) ? 'more' : tab;
 
@@ -103,11 +121,13 @@ export const App = () => {
         {tab === 'lab' && <ModelLabScreen />}
         {tab === 'more' && (
           <div>
-            <header><h1 className="text-xl font-extrabold">더보기</h1></header>
-            <div className="mt-3 divide-y divide-rail rounded-xl bg-steel">
-              {([['program', '프로그램 조회·편집', '요일별 운동, 세트·반복·RPE'], ['history', '운동 기록', '운동별 이력, 수정·삭제·복원'], ['analysis', '분석', '근육군별 세트, 추세 그래프, 피로 신호'], ['lab', '모델 실험실', '개인화 계수와 예측 오차'], ['settings', '설정·데이터', '백업·복원, 체중, 원판, 증량 단위']] as const).map(([t, l, s]) => (
-                <button key={t} type="button" className="flex min-h-[60px] w-full items-center justify-between px-4 text-left" onClick={() => go(t)}>
-                  <span><span className="block font-semibold">{l}</span><span className="block text-xs text-dust">{s}</span></span><span className="text-dust" aria-hidden>›</span>
+            <header><h1 className="text-lg font-extrabold">더보기</h1></header>
+            <div className="mt-2 divide-y divide-rail overflow-hidden rounded-xl bg-steel">
+              {MORE.map(([t, l, sub, Icon]) => (
+                <button key={t} type="button" className="press flex min-h-[56px] w-full items-center gap-3 px-3 text-left" onClick={() => go(t)}>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-deck text-dust"><Icon size={18} /></span>
+                  <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">{l}</span><span className="block truncate text-xs text-dust">{sub}</span></span>
+                  <ChevronRight size={18} className="text-knurl" aria-hidden />
                 </button>
               ))}
             </div>
@@ -120,18 +140,18 @@ export const App = () => {
         </Sheet>
       )}
       {toast && (
-        <div className="fixed inset-x-0 bottom-[64px] z-50 mx-auto flex max-w-[496px] items-center justify-between gap-3 rounded-xl px-3 py-1 text-sm shadow-lg" role="status"
+        <div key={toast.id} className="toast-in toast-pos fixed inset-x-0 z-50 mx-auto flex max-w-[496px] items-center justify-between gap-3 rounded-xl px-3 py-1 text-sm shadow-lg" role="status"
           style={{ background: toast.kind === 'error' ? 'var(--color-p25)' : 'var(--color-chalk)', color: toast.kind === 'error' ? '#fff' : 'var(--color-iron)', marginInline: 'max(12px, calc(50% - 248px))' }}>
           <span>{toast.text}</span>
           {toast.action ? <Btn kind="quiet" className="shrink-0 !text-inherit underline" onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</Btn>
             : <button type="button" className="tap shrink-0 text-xs underline" onClick={dismissToast}>닫기</button>}
         </div>
       )}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-rail bg-iron/95 backdrop-blur" aria-label="주요 메뉴" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-rail bg-iron/95 backdrop-blur" aria-label="주요 메뉴" style={{ paddingBottom: 'env(safe-area-inset-bottom)', viewTransitionName: 'nav' }}>
         <div className="mx-auto grid max-w-[520px] grid-cols-5">
-          {NAV.map(([t, l]) => (
-            <button key={t} type="button" aria-current={active === t ? 'page' : undefined} onClick={() => go(t)} className={cx('relative h-14 text-[13px] font-bold', active === t ? 'text-chalk' : 'text-dust')}>
-              {active === t && <span className="absolute inset-x-5 top-0 h-[3px] rounded-b bg-p15" aria-hidden />}
+          {NAV.map(([t, l, Icon]) => (
+            <button key={t} type="button" aria-current={active === t ? 'page' : undefined} onClick={() => go(t)} className={cx('press relative flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-bold', active === t ? 'text-chalk' : 'text-dust')}>
+              <Icon size={21} strokeWidth={active === t ? 2.4 : 1.9} className={active === t ? 'text-p15' : ''} aria-hidden />
               {l}
             </button>
           ))}

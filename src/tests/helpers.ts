@@ -16,7 +16,7 @@ export const makeDb = (weeks: string[] = [START]): Db => {
   db.exercises = Object.fromEntries(DEFAULT_EXERCISES.map((e) => [e.id, e]));
   const v = defaultProgramVersion('2026-11-13T00:00:00.000Z', START);
   db.versions = { [v.id]: v };
-  db.settings = { ...db.settings, programStart: START, onboardingDone: true, bodyweight: 66 };
+  db.settings = { ...db.settings, programStart: START, onboardingDone: true, bodyweight: 66, formulaVersion: 'e1rm-rts-2.0.0' };
   db = applyPatch(db, ensureWeeks(db, weeks));
   return db;
 };

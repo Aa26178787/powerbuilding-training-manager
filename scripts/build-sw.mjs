@@ -6,12 +6,14 @@ import { createHash } from 'node:crypto';
 
 const dist = new URL('../dist/', import.meta.url).pathname;
 const ALLOW = /\.(html|js|css|svg|png|webmanifest|woff2)$/;
+// Pretendard 글자 묶음(약 90개)은 미리 받지 않고, 처음 쓰일 때 받아서 보관한다
+const RUNTIME_ONLY = /Pretendard/i;
 const files = [];
 const walk = (dir) => {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (statSync(p).isDirectory()) walk(p);
-    else if (ALLOW.test(name) && name !== 'sw.js') files.push(relative(dist, p).replaceAll('\\', '/'));
+    else if (ALLOW.test(name) && name !== 'sw.js' && !RUNTIME_ONLY.test(name)) files.push(relative(dist, p).replaceAll('\\', '/'));
   }
 };
 walk(dist);
@@ -26,10 +28,19 @@ self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('ptm-shell-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
+const FONTS = 'ptm-fonts';
 // 같은 출처의 GET만 처리: 캐시 우선, 없으면 네트워크. 훈련 데이터는 여기 저장하지 않는다(IndexedDB 전용).
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (url.pathname.endsWith('.woff2')) {
+    // 서체 파일은 이름에 해시가 있어 바뀌지 않으므로, 한 번 받으면 보관해 두고 오프라인에서도 쓴다
+    e.respondWith(caches.match(e.request, { ignoreVary: true }).then((hit) => hit || fetch(e.request).then((res) => {
+      if (res.ok) { const copy = res.clone(); caches.open(FONTS).then((c) => c.put(e.request, copy)); }
+      return res;
+    })));
+    return;
+  }
   e.respondWith(caches.match(e.request, { ignoreSearch: true, ignoreVary: true }).then((hit) => hit || fetch(e.request).catch(() => (e.request.mode === 'navigate' ? caches.match('./') : Response.error()))));
 });
 `;

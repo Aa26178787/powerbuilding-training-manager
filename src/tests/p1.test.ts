@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Db, PlannedSet } from '../domain/types';
 import { DEFAULT_MUSCLES } from '../domain/defaults';
-import { calculateWeightedMuscleSets, evaluateCoefficients, fatigueSignals, predictRpe, warmupPlan, conservativeE1RM, impliedE1RM } from '../engine';
+import { calculateWeightedMuscleSets, evaluateCoefficients, fatigueSignals, predictRpe, warmupPlan, conservativeE1RM, impliedE1RM, loadForTarget } from '../engine';
 import { recordSet, editPerformedSet, recordArmRow } from '../application/session';
 import { assignArmDays, suggestArmDates } from '../application/arm';
 import { parseArmJson } from '../data-import/armImport';
@@ -33,7 +33,8 @@ const squatSession = (db0: Db, date: string, topW: number, topRpe: number, boRpe
 describe('개인화 계수 학습 (FR-034, FR-035, TC-020)', () => {
   it('예측 RPE는 추천식의 역함수', () => {
     const e = conservativeE1RM(150, 5, 8);
-    expect(predictRpe(e, 1, e / (1 + 8 / 30), 5)).toBeCloseTo(7, 9);
+    expect(predictRpe(e, 1, loadForTarget(e, 5, 7), 5)).toBeCloseTo(7, 6);
+    expect(predictRpe(e, 1, loadForTarget(e, 3, 8.5), 3)).toBeCloseTo(8.5, 6);
   });
   it('재생 평가: 관측 이전 계수로만 예측(누수 없음), ±5% 제한, 제외 관측은 학습 안 함', () => {
     const ref = 180;
@@ -134,7 +135,7 @@ describe('추세·피로·워밍업·CSV', () => {
     db = squatSession(db, '2026-12-07', 152.5, 8, 7).db;
     const t = exerciseTrend(db, 'comp_squat');
     expect(t.e1rm.map((p) => p.date)).toEqual([START, '2026-12-07']);
-    expect(t.e1rm[0].value).toBe(182.5);
+    expect(t.e1rm[0].value).toBe(182); // 150 / 82.4% = 182.04
     expect(t.load[1].value).toBe(152.5);
   });
   it('피로 신호: 반복되는 상한 초과, 중량 정체 속 RPE 상승', () => {
@@ -189,5 +190,22 @@ describe('ARM 빠른 입력·일괄 배정', () => {
     // 중량 없이(밴드·맨손) 기록
     db = run(db, recordArmRow(db, { plannedSetId: sets[2].id, date: START, left: null, right: null, reps: 6 }, ctx));
     expect(Object.values(db.performed).find((p) => p.plannedSetId === sets[2].id)).toMatchObject({ side: 'both', weight: null });
+  });
+});
+
+describe('공식 변경 마이그레이션', () => {
+  it('공식 버전이 다르면 관측을 새 공식으로 다시 만들고 k 재계산, 같으면 아무것도 안 함', async () => {
+    const { migrateFormula } = await import('../application/learning');
+    const { FORMULA_VERSION } = await import('../engine/e1rm');
+    let { db } = squatSession(makeDb(), START, 150, 8, 8);
+    const id = `k:pb:${START}:mon_sq`;
+    // 옛 공식으로 계산된 것처럼 기준 e1RM을 바꿔 둔다
+    db = { ...db, settings: { ...db.settings, formulaVersion: 'e1rm-rir30-1.0.0' }, coeffs: { ...db.coeffs, [id]: { ...db.coeffs[id], refE1rm: 182.5, override: 'include' } } };
+    const p = migrateFormula(db, makeCtx())!;
+    db = run(db, p);
+    expect(db.coeffs[id].refE1rm).toBeCloseTo(150 / 0.824, 6);
+    expect(db.coeffs[id].override).toBe('include');
+    expect(db.settings.formulaVersion).toBe(FORMULA_VERSION);
+    expect(migrateFormula(db, makeCtx())).toBeNull();
   });
 });

@@ -31,11 +31,11 @@ const Importer = ({ hasData }: { hasData: boolean }) => {
     <div className="rounded-xl bg-steel p-3">
       <p className="text-sm">구매한 ARM SYSTEM의 추출 JSON 파일을 이 기기에서 직접 선택합니다. 파일은 이 브라우저 안에만 저장되고 앱 배포본에는 포함되지 않습니다.</p>
       <label className="mt-3 block">
-        <span className="tap inline-flex cursor-pointer items-center rounded-[10px] border border-rail bg-iron px-4 text-[15px] font-semibold">{hasData ? '다른 JSON으로 교체' : 'ARM JSON 파일 선택'}</span>
+        <span className="tap inline-flex cursor-pointer items-center press rounded-lg bg-deck px-4 text-sm font-semibold">{hasData ? '다른 JSON으로 교체' : 'ARM JSON 파일 선택'}</span>
         <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ''; }} />
       </label>
       {res && (
-        <div className="mt-3 rounded-lg bg-iron p-3 text-sm">
+        <div className="mt-3 rounded-lg bg-deck p-3 text-sm">
           <div className="font-bold break-all">{name}</div>
           {!res.ok && <ul className="mt-1 list-disc pl-5 text-p25">{res.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
           {res.ok && res.summary && (
@@ -65,7 +65,7 @@ const OverrideSheet = ({ db, p, onClose }: { db: Db; p: ArmPrescription; onClose
         }}>교정값 저장</Btn>
       </div>}>
       <p className="text-sm">PDF {p.source_page}쪽을 직접 확인한 값만 입력하세요. 추출 원문은 그대로 보존되고 교정값은 따로 저장됩니다.</p>
-      <div className="mt-2 rounded-lg bg-iron p-2.5 text-sm"><span className="text-dust">추출 원문: </span>{p.prescription_source}</div>
+      <div className="mt-2 rounded-lg bg-deck p-2.5 text-sm"><span className="text-dust">추출 원문: </span>{p.prescription_source}</div>
       <div className="mt-3 grid grid-cols-4 gap-2">
         {([['sets', '세트'], ['reps', '반복'], ['secs', '초'], ['rpe', 'RPE']] as const).map(([k, l]) => (
           <label key={k} className="text-xs text-dust">{l}<input className="field num mt-1 px-1 text-center" type="number" inputMode="decimal" step="any" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} /></label>

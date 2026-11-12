@@ -93,13 +93,13 @@ export const SettingsScreen = () => {
             : <span className="text-xs text-dust">Chrome 메뉴 ⋮ → 홈 화면에 추가</span>}
         </Row>
         <Row label="세션 중 화면 켜 두기">
-          <input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세션 중 화면 켜 두기" checked={s.keepAwake} onChange={(e) => void run(() => ({ settings: { keepAwake: e.target.checked } }))} />
+          <label className="-mr-2 flex h-11 w-11 items-center justify-center"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세션 중 화면 켜 두기" checked={s.keepAwake} onChange={(e) => void run(() => ({ settings: { keepAwake: e.target.checked } }))} /></label>
         </Row>
         <Row label="휴식 타이머">
-          <input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="휴식 타이머" checked={s.restTimer} onChange={(e) => void run(() => ({ settings: { restTimer: e.target.checked } }))} />
+          <label className="-mr-2 flex h-11 w-11 items-center justify-center"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="휴식 타이머" checked={s.restTimer} onChange={(e) => void run(() => ({ settings: { restTimer: e.target.checked } }))} /></label>
         </Row>
         <Row label="세트 완료 진동">
-          <input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세트 완료 진동" checked={s.haptics} onChange={(e) => void run(() => ({ settings: { haptics: e.target.checked } }))} />
+          <label className="-mr-2 flex h-11 w-11 items-center justify-center"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세트 완료 진동" checked={s.haptics} onChange={(e) => void run(() => ({ settings: { haptics: e.target.checked } }))} /></label>
         </Row>
         <p className="pb-2 text-xs text-dust">설치하면 주소창 없이 열리고, 브라우저가 기록을 지울 가능성이 줄어듭니다. 그래도 백업 파일은 주기적으로 내보내세요.</p>
       </div>
@@ -122,11 +122,11 @@ export const SettingsScreen = () => {
           download(`ptm-records-${todayStr()}.csv`, csv, 'text/csv;charset=utf-8'); toast('수행 기록 CSV를 내보냈습니다');
         }}>수행 기록 CSV 내보내기</Btn>
         <label className="mt-2 block">
-          <span className="tap flex w-full cursor-pointer items-center justify-center rounded-[10px] border border-rail bg-iron px-4 text-[15px] font-semibold">백업 파일에서 복원</span>
+          <span className="tap flex w-full cursor-pointer items-center justify-center press rounded-lg bg-deck px-4 text-sm font-semibold">백업 파일에서 복원</span>
           <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => { void onImport(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
         {check && (
-          <div className="mt-3 rounded-lg bg-iron p-3 text-sm">
+          <div className="mt-3 rounded-lg bg-deck p-3 text-sm">
             {!check.ok ? <ul className="list-disc pl-5 text-p25">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : (
               <>
                 <div className="font-bold">복원 미리보기</div>

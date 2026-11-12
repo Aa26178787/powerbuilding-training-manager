@@ -1,6 +1,7 @@
 // 모델 실험실: 개인화 계수(k), 관측 이력, 기본 모델 대비 예측 오차, 학습 설정
 import { useState } from 'react';
 import { fmtDateKo } from '../../engine/dates';
+import { FORMULA_VERSION, rtsPercent } from '../../engine/e1rm';
 import { coefficientEvaluation, lambdaFor, setCoefficientManually, setObservationOverride, updateLearningSettings } from '../../application/learning';
 import { ask, run, toast, useApp } from '../store';
 import { Badge, Btn, Empty, Row, SectionTitle } from '../components';
@@ -27,7 +28,7 @@ export const ModelLabScreen = () => {
 
       <SectionTitle>학습 설정</SectionTitle>
       <div className="rounded-xl bg-steel px-3 py-1">
-        <Row label="자동 학습"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="자동 학습" checked={s.emaEnabled} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { emaEnabled: e.target.checked }, ctx))} /></Row>
+        <Row label="자동 학습"><label className="-mr-2 flex h-11 w-11 items-center justify-center"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="자동 학습" checked={s.emaEnabled} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { emaEnabled: e.target.checked }, ctx))} /></label></Row>
         <Row label="학습률 λ — SBD·딥스·풀업">
           <select className="field num w-24" value={s.ema.lambdaStrength} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { lambdaStrength: Number(e.target.value) }, ctx))}>{[0.05, 0.1, 0.15, 0.2, 0.3].map((n) => <option key={n} value={n}>{n}</option>)}</select>
         </Row>
@@ -47,14 +48,14 @@ export const ModelLabScreen = () => {
 
       <div className="mt-2 rounded-xl bg-steel p-3">
         <div className="flex items-end justify-between gap-2">
-          <div><div className="text-xs text-dust">현재 보정계수 k</div><div className="num text-3xl font-extrabold">{f3(k)}</div></div>
+          <div><div className="text-xs text-dust">현재 보정계수 k</div><div className="num-d text-[40px] leading-none font-bold">{f3(k)}</div></div>
           <div className="num text-right text-xs text-dust">λ {lambdaFor(db, sel.id)} · 유효 관측 {ev.n}건{!s.emaEnabled ? ' · 자동 학습 꺼짐' : ''}</div>
         </div>
         <p className="mt-1 text-xs text-dust">{sel.variationOf ? `첫 수행 시작 중량 = Comp e1RM × ${sel.variationOf.kBase} × k` : 'Backoff 추천 = 보수적 e1RM × k에서 목표 반복·RPE로 환산'}. 목표는 k를 1에 맞추는 것이 아니라 예측 오차를 줄이는 것입니다.</p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-iron p-2"><div className="num text-lg font-extrabold">{ev.maeModel === null ? '—' : ev.maeModel.toFixed(2)}</div><div className="text-[11px] text-dust">개인화 평균 오차</div></div>
-          <div className="rounded-lg bg-iron p-2"><div className="num text-lg font-extrabold">{ev.maeBaseline === null ? '—' : ev.maeBaseline.toFixed(2)}</div><div className="text-[11px] text-dust">기본(k=1) 평균 오차</div></div>
-          <div className="rounded-lg bg-iron p-2"><div className="num text-lg font-extrabold">{ev.overCapRate === null ? '—' : `${Math.round(ev.overCapRate * 100)}%`}</div><div className="text-[11px] text-dust">상한 초과 비율</div></div>
+          <div className="rounded-lg bg-deck p-2"><div className="num-d text-[22px] leading-tight">{ev.maeModel === null ? '—' : ev.maeModel.toFixed(2)}</div><div className="text-[11px] text-dust">개인화 평균 오차</div></div>
+          <div className="rounded-lg bg-deck p-2"><div className="num-d text-[22px] leading-tight">{ev.maeBaseline === null ? '—' : ev.maeBaseline.toFixed(2)}</div><div className="text-[11px] text-dust">기본(k=1) 평균 오차</div></div>
+          <div className="rounded-lg bg-deck p-2"><div className="num-d text-[22px] leading-tight">{ev.overCapRate === null ? '—' : `${Math.round(ev.overCapRate * 100)}%`}</div><div className="text-[11px] text-dust">상한 초과 비율</div></div>
         </div>
         <p className="num mt-2 text-xs text-dust">평균 편향(실제 − 예측): 개인화 {f2(ev.biasModel)} · 기본 {f2(ev.biasBaseline)} RPE. {ev.n < 4 ? `표본이 ${ev.n}건뿐이라 아직 판단하기 이릅니다.` : ''}</p>
         {obs.filter((r) => r.used).length >= 2 && (
@@ -100,6 +101,22 @@ export const ModelLabScreen = () => {
         </ul>
       )}
       <p className="mt-2 text-xs text-dust">각 관측의 예측은 그 관측 이전까지의 k로 계산하고, 평가한 뒤에 학습합니다. 모델 버전 {ev.modelVersion}.</p>
+
+      <SectionTitle>RPE 환산표 (RTS)</SectionTitle>
+      <div className="overflow-x-auto rounded-xl bg-steel p-2">
+        <table className="w-full text-center">
+          <caption className="pb-1 text-left text-[11px] text-dust">1RM 대비 % — 행은 반복수, 열은 RPE. 모든 중량 추천과 e1RM이 이 표를 씁니다(Top Set e1RM은 RPE를 0.5 높게 보는 보수화 적용). 12회 초과는 Epley 비율로 이어 붙입니다. 계산식 {FORMULA_VERSION}.</caption>
+          <thead><tr className="text-[11px] text-dust"><th className="py-1 font-normal">회</th>{[10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6].map((p) => <th key={p} className="num-d py-1 text-[13px] font-semibold">{p}</th>)}</tr></thead>
+          <tbody>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((r) => (
+              <tr key={r} className="border-t border-rail">
+                <th className="num-d py-1 text-[13px] font-semibold text-dust">{r}</th>
+                {[10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6].map((p) => <td key={p} className="num-d py-1 text-[14px]">{(rtsPercent(r + 10 - p) * 100).toFixed(1)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

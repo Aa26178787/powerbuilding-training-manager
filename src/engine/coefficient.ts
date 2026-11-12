@@ -1,8 +1,8 @@
 // 개인화 계수 EMA (SRS FR-034, FR-035, 보완 A)
 // k는 저장된 관측 기록을 시간순으로 다시 계산(replay)해 얻는다. 각 관측의 예측은 그 관측 이전의 k만 쓰므로 데이터 누수가 없다.
-import { impliedE1RM } from './e1rm';
+import { impliedE1RM, rtsEffectiveReps } from './e1rm';
 
-export const COEFF_MODEL_VERSION = 'ema-clamp-1.1.0';
+export const COEFF_MODEL_VERSION = 'ema-clamp-rts-2.0.0';
 
 /** 관측계수 = Backoff(또는 Variation 대표 세트)의 역산 e1RM ÷ 기준 e1RM */
 export const observedK = (weight: number, reps: number, rpe: number, referenceE1rm: number): number => {
@@ -21,10 +21,10 @@ export const updateCoefficient = (kPrev: number, kObserved: number, lambda: numb
   return { kPrev, kObserved, kObservedClamped: clamped, kNext: (1 - lambda) * kPrev + lambda * clamped, lambda, modelVersion: COEFF_MODEL_VERSION };
 };
 
-/** 주어진 계수 k에서, 실제로 든 중량·반복이 몇 RPE일지 예측: W = k·e1RM / (1 + (r + 10 − p)/30) 를 p에 대해 풂 */
+/** 주어진 계수 k에서, 실제로 든 중량·반복이 몇 RPE일지 예측: W = k·e1RM·RTS(r + 10 − p) 를 p에 대해 풂 */
 export const predictRpe = (refE1rm: number, k: number, load: number, reps: number): number => {
   if (!(refE1rm > 0) || !(k > 0) || !(load > 0)) throw new RangeError('예측 입력이 유효하지 않습니다');
-  return reps + 10 - 30 * ((refE1rm * k) / load - 1);
+  return reps + 10 - rtsEffectiveReps(load / (refE1rm * k));
 };
 
 export interface CoeffRecordInput {

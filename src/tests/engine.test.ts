@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addDays, weekStart, weekdayOf, monthEnd, dateInTz, conservativeE1RM, impliedE1RM, loadForTarget, validateSetInput,
+  addDays, weekStart, weekdayOf, monthEnd, dateInTz, conservativeE1RM, impliedE1RM, loadForTarget, validateSetInput, rtsPercent, rtsEffectiveReps, RTS_PCT,
   roundLoad, plateBreakdown, minBarbellStep, recommendBackoff, adviseNextSet, variationStartLoad,
   observedK, updateCoefficient, decideProgression, calculateAchievement,
 } from '../engine';
@@ -20,16 +20,40 @@ describe('날짜', () => {
   });
 });
 
+describe('RTS RPE 표', () => {
+  it('출처 표의 칸과 일치(대각선 규칙 포함)', () => {
+    // 출처: RTS/Tuchscherer 표 — 1회@10 100, 3회@8 86.3, 5회@8 81.1, 8회@7 70.7, 12회@6 57.2
+    const at = (reps: number, rpe: number) => Math.round(rtsPercent(reps + 10 - rpe) * 1000) / 10;
+    expect(at(1, 10)).toBe(100);
+    expect(at(3, 8)).toBe(86.3);
+    expect(at(3, 10)).toBe(at(1, 8)); // 3회@10 = 1회@8 = 92.2
+    expect(at(1, 8)).toBe(92.2);
+    expect(at(5, 8)).toBe(81.1);
+    expect(at(8, 7)).toBe(70.7);
+    expect(at(7, 6.5)).toBe(72.3);
+    expect(at(12, 6)).toBe(57.2);
+    expect(RTS_PCT.length).toBe(31);
+  });
+  it('표 밖 외삽은 연속·단조, 역함수 일치', () => {
+    expect(rtsPercent(16)).toBeCloseTo(0.572, 9);
+    expect(rtsPercent(16.0001)).toBeCloseTo(0.572, 4);
+    expect(rtsPercent(20)).toBeLessThan(rtsPercent(16));
+    expect(rtsPercent(0.5)).toBeGreaterThan(1);
+    for (const e of [1, 3.25, 8, 12.75, 16, 22]) expect(rtsEffectiveReps(rtsPercent(e))).toBeCloseTo(e, 6);
+  });
+});
+
 describe('e1RM·Backoff (TC-001, TC-002, TC-005)', () => {
   it('보수적 e1RM과 Backoff가 재현 가능', () => {
-    expect(conservativeE1RM(150, 5, 8)).toBeCloseTo(182.5, 6);
+    expect(conservativeE1RM(150, 5, 8)).toBeCloseTo(150 / 0.824, 6); // 유효 반복 6.5 → 82.4%
     const r = recommendBackoff({ topWeight: 150, topReps: 5, topRpe: 8, backoffReps: 5, backoffTargetRpe: 7, k: 1, increment: 2.5, rounding: 'down' });
-    expect(r.raw).toBeCloseTo(182.5 / (1 + 8 / 30), 6);
+    expect(r.raw).toBeCloseTo((150 / 0.824) * 0.786, 6); // 5회@7 → 78.6%
     expect(r.rounded).toBe(142.5);
     expect(recommendBackoff(r.inputs)).toEqual(r); // 같은 입력 → 같은 출력
   });
   it('RPE 10 이상에서도 보수화 항이 음수가 되지 않음', () => {
-    expect(conservativeE1RM(100, 3, 10)).toBeCloseTo(110, 6);
+    expect(conservativeE1RM(100, 3, 10)).toBeCloseTo(100 / 0.922, 6);
+    expect(conservativeE1RM(100, 1, 10)).toBeCloseTo(100, 9);
   });
   it('개인 보정계수 반영', () => {
     const a = recommendBackoff({ topWeight: 100, topReps: 5, topRpe: 7.5, backoffReps: 5, backoffTargetRpe: 7, k: 1, increment: 1.25, rounding: 'down' });
@@ -47,9 +71,9 @@ describe('e1RM·Backoff (TC-001, TC-002, TC-005)', () => {
     const base = { topWeight: 40, topReps: 5, topRpe: 8, backoffReps: 5, backoffTargetRpe: 7, k: 1, increment: 1.25, rounding: 'down' as const };
     const a = recommendBackoff({ ...base, bodyweight: 66 });
     const b = recommendBackoff({ ...base, bodyweight: 67 });
-    expect(a.e1rmConservative).toBeCloseTo(106 * (1 + 6.5 / 30), 6);
-    expect(b.e1rmConservative).toBeCloseTo(107 * (1 + 6.5 / 30), 6);
-    expect(a.raw).toBeCloseTo(a.e1rmConservative / (1 + 8 / 30) - 66, 6);
+    expect(a.e1rmConservative).toBeCloseTo(106 / 0.824, 6);
+    expect(b.e1rmConservative).toBeCloseTo(107 / 0.824, 6);
+    expect(a.raw).toBeCloseTo(a.e1rmConservative * 0.786 - 66, 6);
     expect(a.rounded % 1.25).toBeCloseTo(0, 6);
     expect(a.rounded).toBeLessThanOrEqual(a.raw);
   });
@@ -69,7 +93,7 @@ describe('e1RM·Backoff (TC-001, TC-002, TC-005)', () => {
   it('Variation 시작 중량', () => {
     const r = variationStartLoad(180, 0.925, 1, 10, 7, 2.5);
     expect(r.estimated1rm).toBeCloseTo(166.5, 6);
-    expect(r.rounded).toBe(115); // 166.5 / (1 + 13/30) = 116.16 → 내림
+    expect(r.rounded).toBe(107.5); // 166.5 × 65.3%(10회@7) = 108.7 → 내림
   });
 });
 
@@ -134,6 +158,8 @@ describe('진행 판정 (TC-003, TC-004, TC-006)', () => {
 describe('개인화 계수 EMA (TC-020)', () => {
   it('관측계수와 ±5% 제한 후 EMA', () => {
     expect(observedK(142.5, 5, 7, 182.5)).toBeCloseTo(impliedE1RM(142.5, 5, 7) / 182.5, 9);
+    expect(impliedE1RM(142.5, 5, 7)).toBeCloseTo(142.5 / 0.786, 9);
+    expect(loadForTarget(200, 3, 8)).toBeCloseTo(200 * 0.863, 9);
     const u = updateCoefficient(1, 1.2, 0.15, 5);
     expect(u.kObservedClamped).toBeCloseTo(1.05, 9);
     expect(u.kNext).toBeCloseTo(0.85 + 0.15 * 1.05, 9);

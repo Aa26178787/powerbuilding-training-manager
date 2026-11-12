@@ -5,6 +5,7 @@ import type { Db, ISODate, Patch } from '../domain/types';
 import { DEFAULT_EXERCISES, defaultProgramVersion, emptyDb } from '../domain/defaults';
 import { applyPatch, Ctx, UseCaseError } from '../application/ctx';
 import { ensureWeeks } from '../application/plan';
+import { migrateFormula } from '../application/learning';
 import { commitPatch, ConflictError, loadAll, openStore, replaceAll } from '../repositories/idb';
 import { dateInTz, weekStart } from '../engine/dates';
 
@@ -67,6 +68,9 @@ export const initApp = async () => {
     db = await loadAll(idb);
     // 첫 실행: 기본 운동과 V1.9 프리셋을 넣는다
     if (!Object.keys(db.exercises).length) { await commitPatch(idb, seed); db = applyPatch(db, seed); }
+    // 계산식이 바뀐 버전으로 처음 열면 계수 관측을 새 공식으로 다시 계산(수행 기록은 그대로)
+    const mig = migrateFormula(db, makeCtx());
+    if (mig) { await commitPatch(idb, mig); db = applyPatch(db, mig); }
   } catch {
     // 저장소를 열 수 없는 환경(사생활 보호 모드·임베드 화면): 메모리에서만 동작하고 그 사실을 화면에 알린다
     idb = null;

@@ -380,6 +380,8 @@ export interface Settings {
   haptics: boolean;
   /** 세트 완료 후 휴식 타이머 표시 */
   restTimer: boolean;
+  /** 저장된 계수 관측이 계산된 e1RM 공식 버전(바뀌면 관측을 다시 계산) */
+  formulaVersion?: string;
   /** 개인화 계수 자동 학습(끄면 관측만 기록하고 k는 그대로) */
   emaEnabled: boolean;
   /** Backoff 세트 간 예상 RPE 상승폭(다음 세트 상한 초과 예측용, 조정 가능) */

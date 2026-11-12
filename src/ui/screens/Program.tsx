@@ -135,7 +135,7 @@ export const ProgramScreen = () => {
       {adding && (
         <Sheet title={`${WEEKDAY_KO[wd]}요일에 운동 추가`} onClose={() => setAdding(false)}>
           <div className="text-xs font-bold text-dust">기존 운동에서 선택</div>
-          <div className="mt-1 max-h-56 divide-y divide-rail overflow-y-auto rounded-lg border border-rail">
+          <div className="mt-1 max-h-56 divide-y divide-rail overflow-y-auto rounded-lg bg-deck">
             {Object.values(db.exercises).filter((e) => e.role !== 'arm' && !e.archived).map((e) => (
               <button key={e.id} type="button" className="tap flex w-full items-center px-3 text-left text-sm" onClick={() => addExisting(e)}>{e.name}</button>
             ))}
