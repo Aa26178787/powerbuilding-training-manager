@@ -7,7 +7,7 @@ import { addDays, addMonths, fmtDateKo, monthEnd, monthStart, weekStart } from '
 import { calculateAchievement } from '../../engine/achievement';
 import { exerciseTrend, fatigueReport, muscleVolume, weeklyAchievementTrend } from '../../application/analysis';
 import { run, toast, todayStr, useApp } from '../store';
-import { Btn, Empty, Row, SectionTitle, Sheet } from '../components';
+import { Btn, Chip, Empty, Row, SectionTitle, Sheet } from '../components';
 import { LineChart, StackedBars } from '../charts';
 
 const MUSCLE_KO = Object.fromEntries(MUSCLES);
@@ -72,7 +72,7 @@ export const AnalysisScreen = () => {
       <SectionTitle right={
         <div className="flex items-center">
           <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간"><ChevronLeft size={20} /></Btn>
-          <button type="button" className="num tap text-xs whitespace-nowrap" onClick={() => { setAnchor(today); setMode(mode === 'week' ? 'month' : 'week'); }}>{label} · {mode === 'week' ? '월간으로' : '주간으로'}</button>
+          <span className="flex items-center gap-2"><span className="num text-[13px] whitespace-nowrap">{label}</span><Chip onClick={() => { setAnchor(today); setMode(mode === 'week' ? 'month' : 'week'); }}>{mode === 'week' ? '월간' : '주간'}</Chip></span>
           <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간"><ChevronRight size={20} /></Btn>
         </div>}>근육군별 세트</SectionTitle>
       <div className="rounded-xl bg-steel p-3">
@@ -85,7 +85,7 @@ export const AnalysisScreen = () => {
       <SectionTitle>운동별 추세</SectionTitle>
       <select className="field" value={exId} onChange={(e) => setExId(e.target.value)} aria-label="운동 선택">
         {pbEx.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-        {Object.values(db.exercises).filter((e) => e.role === 'arm').map((e) => <option key={e.id} value={e.id}>ARM · {e.name}</option>)}
+        {Object.values(db.exercises).filter((e) => e.role === 'arm').map((e) => <option key={e.id} value={e.id}>{e.name} (ARM)</option>)}
       </select>
       <div className="mt-2 rounded-xl bg-steel p-3">
         {trend.load.length === 0 ? <p className="text-sm text-dust">이 운동의 기록이 아직 없습니다.</p> : (

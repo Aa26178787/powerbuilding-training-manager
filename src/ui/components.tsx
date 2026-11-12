@@ -35,7 +35,7 @@ export const Badge = ({ tone = 'mute', children }: { tone?: 'mute' | 'ok' | 'war
   <span className={cx(
     'inline-flex shrink-0 items-center self-start rounded-md px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap',
     tone === 'mute' && 'bg-rail text-dust', tone === 'ok' && 'bg-p10/20 text-p10', tone === 'warn' && 'bg-p15/20 text-p15',
-    tone === 'bad' && 'bg-p25/20 text-p25', tone === 'info' && 'bg-p20/20 text-p20',
+    tone === 'bad' && 'bg-p25/20 text-p25', tone === 'info' && 'border border-rail text-dust',
   )}>{children}</span>
 );
 
@@ -51,7 +51,9 @@ export const PlateGauge = ({ pct, label, sub, secondaryPct, size = 200 }: { pct:
   // 처음 그릴 때는 0에서 시작해 한 번 차오른다(홈 화면의 유일한 연출)
   const [shown, setShown] = useState(false);
   useEffect(() => { const id = requestAnimationFrame(() => setShown(true)); return () => cancelAnimationFrame(id); }, []);
-  const off = (p: number | null | undefined, circ: number) => circ * (1 - (shown ? Math.min(100, Math.max(0, p ?? 0)) : 0) / 100);
+  // 아주 작은 값은 둥근 끝이 점처럼 보이므로 최소 4%만큼은 호로 그린다(숫자는 실제 값 그대로)
+  const vis = (p: number | null | undefined) => { const v = Math.min(100, Math.max(0, p ?? 0)); return v > 0 && v < 4 ? 4 : v; };
+  const off = (p: number | null | undefined, circ: number) => circ * (1 - (shown ? vis(p) : 0) / 100);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} role="img" aria-label={`${label} ${pct === null ? '계획 없음' : `${pct}%`}, ${sub}`}>
       <svg viewBox="0 0 200 200" width={size} height={size} className="-rotate-90">

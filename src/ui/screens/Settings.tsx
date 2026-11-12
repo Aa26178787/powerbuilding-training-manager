@@ -130,7 +130,7 @@ export const SettingsScreen = () => {
             {!check.ok ? <ul className="list-disc pl-5 text-p25">{check.errors.map((e, i) => <li key={i}>{e}</li>)}</ul> : (
               <>
                 <div className="font-bold">복원 미리보기</div>
-                <div className="num mt-1 text-dust">내보낸 시각 {check.summary?.exportedAt.slice(0, 16).replace('T', ' ')} · 세션 {check.summary?.counts.sessions ?? 0} · 수행 세트 {check.summary?.counts.performed ?? 0} · 계획 세트 {check.summary?.counts.plannedSets ?? 0} · ARM {check.summary?.includesArm ? '포함' : '미포함'}</div>
+                <div className="num mt-1 text-dust">내보낸 시각 {check.summary?.exportedAt.slice(0, 16).replace('T', ' ')}, 세션 {check.summary?.counts.sessions ?? 0} · 수행 세트 {check.summary?.counts.performed ?? 0} · 계획 세트 {check.summary?.counts.plannedSets ?? 0} · ARM {check.summary?.includesArm ? '포함' : '미포함'}</div>
                 <p className="mt-2 text-p15">지금 이 기기의 모든 데이터가 이 파일 내용으로 바뀝니다.</p>
                 <div className="mt-2 flex gap-2"><Btn className="flex-1" onClick={() => setCheck(null)}>취소</Btn><Btn kind="danger" className="flex-1" onClick={async () => { await restoreBackup(check.db as Db); setCheck(null); toast('백업에서 복원했습니다'); }}>이 파일로 복원</Btn></div>
               </>

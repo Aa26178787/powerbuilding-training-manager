@@ -49,7 +49,7 @@ export const ModelLabScreen = () => {
       <div className="mt-2 rounded-xl bg-steel p-3">
         <div className="flex items-end justify-between gap-2">
           <div><div className="text-xs text-dust">현재 보정계수 k</div><div className="num-d text-[40px] leading-none font-bold">{f3(k)}</div></div>
-          <div className="num text-right text-xs text-dust">λ {lambdaFor(db, sel.id)} · 유효 관측 {ev.n}건{!s.emaEnabled ? ' · 자동 학습 꺼짐' : ''}</div>
+          <div className="num text-right text-xs text-dust">λ {lambdaFor(db, sel.id)}, 유효 관측 {ev.n}건{!s.emaEnabled ? ', 자동 학습 꺼짐' : ''}</div>
         </div>
         <p className="mt-1 text-xs text-dust">{sel.variationOf ? `첫 수행 시작 중량 = Comp e1RM × ${sel.variationOf.kBase} × k` : 'Backoff 추천 = 보수적 e1RM × k에서 목표 반복·RPE로 환산'}. 목표는 k를 1에 맞추는 것이 아니라 예측 오차를 줄이는 것입니다.</p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -57,7 +57,7 @@ export const ModelLabScreen = () => {
           <div className="rounded-lg bg-deck p-2"><div className="num-d text-[22px] leading-tight">{ev.maeBaseline === null ? '—' : ev.maeBaseline.toFixed(2)}</div><div className="text-[11px] text-dust">기본(k=1) 평균 오차</div></div>
           <div className="rounded-lg bg-deck p-2"><div className="num-d text-[22px] leading-tight">{ev.overCapRate === null ? '—' : `${Math.round(ev.overCapRate * 100)}%`}</div><div className="text-[11px] text-dust">상한 초과 비율</div></div>
         </div>
-        <p className="num mt-2 text-xs text-dust">평균 편향(실제 − 예측): 개인화 {f2(ev.biasModel)} · 기본 {f2(ev.biasBaseline)} RPE. {ev.n < 4 ? `표본이 ${ev.n}건뿐이라 아직 판단하기 이릅니다.` : ''}</p>
+        <p className="num mt-2 text-xs text-dust">평균 편향(실제 − 예측): 개인화 {f2(ev.biasModel)}, 기본 {f2(ev.biasBaseline)} RPE. {ev.n < 4 ? `표본이 ${ev.n}건뿐이라 아직 판단하기 이릅니다.` : ''}</p>
         {obs.filter((r) => r.used).length >= 2 && (
           <div className="mt-3">
             <div className="text-sm font-bold">예측 오차 (실제 RPE − 예측 RPE)</div>
@@ -85,8 +85,8 @@ export const ModelLabScreen = () => {
                 </div>
                 {r.kind === 'observation' && rec && (
                   <>
-                    <div className="num mt-1 text-xs text-dust">관측 세트 {rec.obsLoad}kg × {rec.obsReps} @{rec.obsRpe} · 기준 e1RM {rec.refE1rm?.toFixed(1)}kg</div>
-                    <div className="num mt-0.5 text-xs">예측 @{r.predModel?.toFixed(1)} (기본 @{r.predBaseline?.toFixed(1)}) → 실제 @{r.actualRpe} · 오차 {f2(r.errModel)}</div>
+                    <div className="num mt-1 text-xs text-dust">관측 세트 {rec.obsLoad}kg × {rec.obsReps} @{rec.obsRpe}, 기준 e1RM {rec.refE1rm?.toFixed(1)}kg</div>
+                    <div className="num mt-0.5 text-xs">예측 @{r.predModel?.toFixed(1)} (기본 @{r.predBaseline?.toFixed(1)}) → 실제 @{r.actualRpe}, 오차 {f2(r.errModel)}</div>
                     <div className="num mt-0.5 text-xs">k {f3(r.kPrev)} → {f3(r.kNext)} <span className="text-dust">(관측 k {f3(r.kObserved)}{r.kObservedClamped !== undefined && r.kObserved !== undefined && Math.abs(r.kObservedClamped - r.kObserved) > 1e-9 ? `, 제한 후 ${f3(r.kObservedClamped)}` : ''})</span></div>
                     <div className="mt-1.5 flex gap-1.5">
                       {r.used ? <Btn onClick={() => void run((d, ctx) => setObservationOverride(d, r.id, 'exclude', ctx))}>학습에서 제외</Btn> : <Btn onClick={() => void run((d, ctx) => setObservationOverride(d, r.id, 'include', ctx))}>학습에 포함</Btn>}

@@ -40,7 +40,7 @@ const Importer = ({ hasData }: { hasData: boolean }) => {
           {!res.ok && <ul className="mt-1 list-disc pl-5 text-p25">{res.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
           {res.ok && res.summary && (
             <>
-              <div className="num mt-1 text-dust">{res.summary.blocks.join(' → ')} · {res.summary.days}일 · 처방 {res.summary.total}개 (활성 {res.summary.active}, 중복 제외 {res.summary.excluded})</div>
+              <div className="num mt-1 text-dust">{res.summary.blocks.join(' → ')}, {res.summary.days}일, 처방 {res.summary.total}개 (활성 {res.summary.active}, 중복 제외 {res.summary.excluded})</div>
               {res.warnings.map((w, i) => <div key={i} className="mt-1 text-p15">주의: {w}</div>)}
               <Btn kind="primary" className="mt-3 w-full" onClick={async () => { const r = await run(() => ({ arm: res.data })); if (r.ok) { toast('ARM 데이터를 가져왔습니다'); setRes(null); } }}>이 데이터 가져오기</Btn>
             </>
@@ -134,7 +134,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
 
   return (
     <div>
-      <header><h1 className="text-lg font-extrabold">ARM</h1><p className="num text-sm text-dust">{arm.blockOrder.join(' → ')} · 전체 {days.length}일 중 {db.settings.armCursor}일 배정</p></header>
+      <header><h1 className="text-lg font-extrabold">ARM</h1><p className="num mt-0.5 text-[13px] text-dust">{arm.blockOrder.join(' → ')}</p><p className="num text-[13px] text-dust">전체 {days.length}일 중 {db.settings.armCursor}일 배정</p></header>
 
       <SectionTitle>다음 Day 배정</SectionTitle>
       <div className="rounded-xl bg-steel p-3">
@@ -150,7 +150,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
         )}
         {next ? (
           <>
-            <div className="text-lg font-extrabold">{next.block} <span className="num">Week {next.week} · Day {next.day}</span></div>
+            <div className="text-lg font-extrabold">{next.block} <span className="num">Week {next.week} Day {next.day}</span></div>
             <p className="mt-1 text-xs text-dust">달력이 넘어가도 주차가 자동으로 올라가지 않습니다. 직접 배정할 때만 다음 Day로 진행하며, 배정 시점의 처방이 그대로 기록됩니다.</p>
             <label className="mt-3 block text-xs text-dust">수행할 날짜
               <input className="field num mt-1" type="date" value={target} onChange={(e) => setDate(e.target.value)} />
@@ -176,7 +176,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
           <div className="flex gap-1">{([3, 2] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armMode === m} onClick={() => void run(() => ({ settings: { armMode: m } }))} className={cx('h-10 rounded-lg border px-3 font-semibold', db.settings.armMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>주 {m}일</button>)}</div>
         </Row>
         <Row label="기본 요일">
-          <div className="flex gap-1">{[1, 2, 3, 4, 5, 6, 7].map((n) => <button key={n} type="button" aria-pressed={prefer.includes(n)} onClick={() => toggleWd(n)} className={cx('h-10 w-9 rounded-lg border text-sm', prefer.includes(n) ? 'border-p20 bg-p20/20 font-bold' : 'border-rail text-dust')}>{WEEKDAY_KO[n]}</button>)}</div>
+          <div className="flex gap-1">{[1, 2, 3, 4, 5, 6, 7].map((n) => <button key={n} type="button" aria-pressed={prefer.includes(n)} onClick={() => toggleWd(n)} className={cx('h-10 w-9 rounded-lg border text-sm', prefer.includes(n) ? 'border-p15 bg-p15/15 font-bold' : 'border-rail text-dust')}>{WEEKDAY_KO[n]}</button>)}</div>
         </Row>
         <Row label="팔 기록">
           <div className="flex gap-1">{(['separate', 'both'] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armSideMode === m} onClick={() => void run(() => ({ settings: { armSideMode: m } }))} className={cx('h-10 rounded-lg border px-3 text-sm font-semibold', db.settings.armSideMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>{m === 'separate' ? '좌·우 따로' : '한 번에'}</button>)}</div>

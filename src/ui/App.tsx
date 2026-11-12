@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { BicepsFlexed, CalendarDays, ChartLine, ChevronRight, Dumbbell, Ellipsis, FlaskConical, History, House, ListChecks, Settings as SettingsIcon, X, type LucideIcon } from 'lucide-react';
 import type { ISODate } from '../domain/types';
+import { AnimatePresence, m } from 'motion/react';
 import { dismissToast, toast as showToast, todayStr, useApp } from './store';
 import { Btn, closeTopSheet, cx, Sheet } from './components';
 import { activeSession } from '../application/session';
@@ -146,14 +147,21 @@ export const App = () => {
           <p className="text-sm">{confirm.message}</p>
         </Sheet>
       )}
-      {toast && (
-        <div key={toast.id} className="toast-in toast-pos fixed inset-x-0 z-50 mx-auto flex max-w-[496px] items-center justify-between gap-3 rounded-xl px-3 py-1 text-sm shadow-lg" role="status"
-          style={{ background: toast.kind === 'error' ? 'var(--color-p25)' : 'var(--color-chalk)', color: toast.kind === 'error' ? '#fff' : 'var(--color-iron)', marginInline: 'max(12px, calc(50% - 248px))' }}>
-          <span>{toast.text}</span>
-          {toast.action ? <Btn kind="quiet" className="!min-h-[36px] shrink-0 rounded-md bg-white/10 !text-inherit" onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</Btn>
-            : <button type="button" className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-md" aria-label="알림 닫기" onClick={dismissToast}><X size={16} /></button>}
-        </div>
-      )}
+      <AnimatePresence>
+        {toast && (
+          <m.div key={toast.id} role="status" aria-live="polite"
+            className="toast-pos fixed inset-x-0 z-50 mx-auto flex min-h-12 max-w-[496px] touch-pan-y items-center justify-between gap-3 rounded-xl py-1 pr-1.5 pl-4 text-[14px] shadow-[0_8px_24px_rgba(0,0,0,.35)]"
+            style={{ background: toast.kind === 'error' ? 'var(--color-p25)' : 'var(--color-chalk)', color: toast.kind === 'error' ? '#fff' : 'var(--color-iron)', marginInline: 'max(12px, calc(50% - 248px))' }}
+            initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0, transition: { duration: 0.15 } }}
+            transition={{ type: 'spring', duration: 0.3, bounce: 0 }}
+            drag="x" dragSnapToOrigin dragElastic={0.6}
+            onDragEnd={(_, i) => { if (Math.abs(i.offset.x) > 80 || Math.abs(i.velocity.x) > 500) dismissToast(); }}>
+            <span className="min-w-0">{toast.text}</span>
+            {toast.action ? <button type="button" className="press h-10 shrink-0 rounded-lg px-3 text-[14px] font-bold" style={{ background: 'color-mix(in srgb, currentColor 10%, transparent)' }} onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</button>
+              : <button type="button" className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" aria-label="알림 닫기" onClick={dismissToast}><X size={16} aria-hidden /></button>}
+          </m.div>
+        )}
+      </AnimatePresence>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-rail bg-iron/95 backdrop-blur" aria-label="주요 메뉴" style={{ paddingBottom: 'env(safe-area-inset-bottom)', viewTransitionName: 'nav' }}>
         <div className="mx-auto grid max-w-[520px] grid-cols-5">
           {NAV.map(([t, l, Icon]) => (

@@ -1,5 +1,5 @@
 // 홈: 주·월 달성률 게이지, 오늘 운동, ARM 현황, 백업 알림
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ISODate } from '../../domain/types';
 import { addDays, addMonths, fmtDateKo, monthEnd, monthStart, weekStart, datesBetween } from '../../engine/dates';
@@ -14,6 +14,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
   const { db } = useApp();
   const today = todayStr();
   const [mode, setMode] = useState<'week' | 'month'>('week');
+  const [help, setHelp] = useState(false);
   const [anchor, setAnchor] = useState<ISODate>(today);
   const [drill, setDrill] = useState(false);
   const period = mode === 'week' ? { start: weekStart(anchor), end: addDays(weekStart(anchor), 6) } : { start: monthStart(anchor), end: monthEnd(anchor) };
@@ -37,7 +38,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
     if (s.originalDate < period.start || s.originalDate > period.end || !s.inOriginalPlan) continue;
     const name = db.instances[s.instanceId]?.exerciseName ?? s.exerciseId;
     const key = `${s.track}:${name}`;
-    const e = byExercise.get(key) ?? { name: s.track === 'arm' ? `ARM · ${name}` : name, done: 0, total: 0, moved: 0, excused: 0 };
+    const e = byExercise.get(key) ?? { name: s.track === 'arm' ? `${name} (ARM)` : name, done: 0, total: 0, moved: 0, excused: 0 };
     e.total += 1; if (s.status === 'done') e.done += 1; if (s.plannedDate !== s.originalDate) e.moved += 1; if (s.status === 'excused') e.excused += 1;
     byExercise.set(key, e);
   }
@@ -59,10 +60,9 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
             const pb = todayGroups.filter((g) => g.instance.track === 'pb');
             const arm = todayGroups.filter((g) => g.instance.track === 'arm');
             const rows = pb.map((g) => ({ id: g.instance.id, name: g.instance.exerciseName, done: g.sets.filter((x) => x.status === 'done').length, total: g.sets.length, main: g.exercise.role === 'comp' || g.exercise.role === 'strength' }));
-            if (arm.length) rows.push({ id: 'arm', name: `ARM · ${arm[0].workout.label.replace('ARM · ', '')} (${arm.length}종목)`, done: arm.reduce((n, g) => n + g.sets.filter((x) => x.status === 'done').length, 0), total: arm.reduce((n, g) => n + g.sets.length, 0), main: false });
+            if (arm.length) rows.push({ id: 'arm', name: `ARM ${arm[0].workout.label.replace('ARM · ', '')}, ${arm.length}종목`, done: arm.reduce((n, g) => n + g.sets.filter((x) => x.status === 'done').length, 0), total: arm.reduce((n, g) => n + g.sets.length, 0), main: false });
             return rows.map((r) => (
-              <li key={r.id} className="flex min-h-[36px] items-center gap-2 border-b border-rail px-3 last:border-b-0">
-                <span className={cx('h-1.5 w-1.5 shrink-0 rounded-full', r.done === r.total && r.total > 0 ? 'bg-p10' : r.main ? 'bg-p15' : 'bg-knurl')} aria-hidden />
+              <li key={r.id} className="flex min-h-[40px] items-center gap-3 border-b border-rail/70 px-3.5 last:border-b-0">
                 <span className={cx('min-w-0 flex-1 truncate text-[13px]', r.main && 'font-semibold')}>{r.name}</span>
                 <span className={cx('num-d text-[15px]', r.done === r.total && r.total > 0 ? 'text-p10' : 'text-dust')}>{r.done}/{r.total}</span>
               </li>
@@ -79,7 +79,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         </div>
         <div className="flex items-center">
           <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간"><ChevronLeft size={20} /></Btn>
-          <button type="button" className="num tap text-xs whitespace-nowrap" onClick={() => setAnchor(today)}>{label}{isCurrent ? '' : ' · 지금으로'}</button>
+          <span className="flex items-center gap-2"><span className="num text-[13px] whitespace-nowrap">{label}</span>{!isCurrent && <Chip onClick={() => setAnchor(today)}>현재</Chip>}</span>
           <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간"><ChevronRight size={20} /></Btn>
         </div>
       </div>
@@ -96,7 +96,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
           </dl>
         </div>
       </button>
-      <div className="mt-1.5 flex flex-wrap gap-1 empty:hidden">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {a.pb.excusedSets > 0 && <Badge tone="warn">면제 {a.pb.excusedSets}세트</Badge>}
         {a.pb.movedSets > 0 && <Badge tone="info">이동·병합 {a.pb.movedSets}세트</Badge>}
         {a.pb.autoregSkippedSets > 0 && <Badge>조기 종료 {a.pb.autoregSkippedSets}세트</Badge>}
@@ -104,13 +104,15 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         {a.pb.removedSets > 0 && <Badge>삭제·축소 {a.pb.removedSets}세트</Badge>}
         {a.pb.addedSets > 0 && <Badge>추가 {a.pb.addedSets}세트</Badge>}
         {a.pb.extraSets > 0 && <Badge>계획 외 {a.pb.extraSets}세트</Badge>}
+        <Chip className="ml-auto" aria-expanded={help} onClick={() => setHelp(!help)}>{help ? '설명 닫기' : '지표 설명'}</Chip>
       </div>
-      <details className="mt-1"><summary className="press inline-flex h-8 cursor-pointer list-none items-center rounded-md bg-deck px-2.5 text-[12px] font-semibold text-chalk/85 [&::-webkit-details-marker]:hidden">지표 설명</summary><p className="text-xs text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p></details>
+      {help && <p className="mt-2 rounded-xl bg-steel px-3.5 py-3 text-[12.5px] leading-[1.55] text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p>}
 
       {fatigueReport(db).length > 0 && (
-        <button type="button" className="press mt-2 w-full rounded-xl border-l-[3px] border-p15 bg-steel p-2.5 text-left text-[13px]" onClick={() => go('analysis')}>
-          <b>기록 기반 피로 신호 {fatigueReport(db).length}건</b>
-          <span className="block text-xs text-dust">{fatigueReport(db)[0].message}</span>
+        <button type="button" className="press mt-3 flex w-full items-start gap-3 rounded-xl bg-steel px-3.5 py-3 text-left text-[13px]" onClick={() => go('analysis')}>
+          <TriangleAlert size={18} className="mt-0.5 shrink-0 text-p15" aria-hidden />
+          <span className="min-w-0"><b>기록 기반 피로 신호 {fatigueReport(db).length}건</b>
+          <span className="mt-0.5 block text-xs text-dust">{fatigueReport(db)[0].message}</span></span>
         </button>
       )}
 
@@ -128,8 +130,8 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
       </div>
 
       {hasRecords && (backupAge === null || backupAge >= db.settings.backupReminderDays) && (
-        <div className="mt-3 rounded-xl border-l-[3px] border-p15 bg-steel p-2.5 text-[13px]">
-          <b>{backupAge === null ? '아직 백업한 적이 없습니다.' : `마지막 백업이 ${backupAge}일 전입니다.`}</b> 기록은 이 기기의 브라우저에만 저장됩니다.
+        <div className="mt-3 rounded-xl bg-steel px-3.5 py-3 text-[13px] leading-[1.5]">
+          <b className="text-p15">{backupAge === null ? '아직 백업한 적이 없습니다.' : `마지막 백업이 ${backupAge}일 전입니다.`}</b> 기록은 이 기기의 브라우저에만 저장됩니다.
           <Btn className="mt-2 w-full" onClick={() => go('settings')}>백업 파일 내보내기</Btn>
         </div>
       )}

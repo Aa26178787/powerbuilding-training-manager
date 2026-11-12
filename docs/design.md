@@ -31,3 +31,16 @@
 | 홈 게이지 | 처음 열 때 한 번 차오름 (화면의 유일한 연출) | 700ms ease-out |
 
 `prefers-reduced-motion: reduce`이면 모두 끄고 즉시 상태만 바꾼다.
+
+## 2026-11 정리: 참고한 스킬과 채택한 규칙
+
+| 참고 | 채택한 것 | 채택하지 않은 것 |
+|---|---|---|
+| Motion (motion.dev) | 세트 행·카드의 자리 이동(layout), 세트 진행 막대, 토스트 등장·옆으로 밀어 닫기. `LazyMotion`+`MotionConfig reducedMotion="user"` | 스크롤 연출 |
+| anime.js | 없음. Motion과 역할이 겹쳐 애니메이션 도구는 하나만 쓴다 | 전체 |
+| emil-design-eng | 사용자 동작에만 움직임, 300ms 미만, 강한 ease-out, 자주 쓰는 동작은 짧게 | 장식용 연출 |
+| Hallmark | 카드 안에 카드 금지, 가운뎃점 메타 문자열 금지, 장식용 상태 점 금지, 왼쪽 색 줄무늬 금지 | 랜딩 페이지 규칙 |
+| taste-skill | 버튼·카드·태그 모양을 한 가지씩만, 상자 깊이 2단까지, 44px 터치 영역 | 랜딩 페이지·사진·WebGL 규칙 |
+| UI UX Pro Max | 4/8px 간격 리듬, 눌림 피드백, 색만으로 상태 구분 금지 | 스타일 추천(운동 앱에 주황 강조 등) |
+| web-design-guidelines (Vercel) | 알림 aria-live, 아이콘 aria-hidden, 숫자 tabular-nums, 링크처럼 보이는 텍스트 버튼 금지 | Title Case(한국어에 해당 없음) |
+| bklit ui | 차트 규칙(장식 층은 하나, 배경은 조용히, 한 계열에 효과를 겹치지 않음) | 컴포넌트 설치(shadcn·visx 의존성이 커서) |

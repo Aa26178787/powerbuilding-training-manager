@@ -26,7 +26,7 @@ export const HistoryScreen = () => {
   const e1 = (p: PerformedSet): string => {
     if (p.type !== 'top' || p.weight === null || p.reps === undefined || p.rpe === undefined) return '';
     const sys = p.weight + (ex?.loadMode === 'bodyweight_plus' ? p.bodyweight ?? 0 : 0);
-    return validateSetInput(sys, p.reps, p.rpe).length ? '' : ` · e1RM ${conservativeE1RM(sys, p.reps, p.rpe).toFixed(1)}`;
+    return validateSetInput(sys, p.reps, p.rpe).length ? '' : `  e1RM ${conservativeE1RM(sys, p.reps, p.rpe).toFixed(1)}`;
   };
   return (
     <div>
@@ -34,7 +34,7 @@ export const HistoryScreen = () => {
       {used.length === 0 ? <div className="mt-4"><Empty>아직 기록이 없습니다. 오늘 화면에서 세트를 완료하면 여기에 쌓입니다.</Empty></div> : (
         <>
           <select className="field mt-3" value={sel} onChange={(e) => setExId(e.target.value)} aria-label="운동 선택">
-            {used.map((e) => <option key={e.id} value={e.id}>{e.role === 'arm' ? 'ARM · ' : ''}{e.name}</option>)}
+            {used.map((e) => <option key={e.id} value={e.id}>{e.name}{e.role === 'arm' ? ' (ARM)' : ''}</option>)}
           </select>
           {ex && ex.role !== 'arm' && (
             <div className="mt-3 rounded-xl bg-steel p-3 text-sm">

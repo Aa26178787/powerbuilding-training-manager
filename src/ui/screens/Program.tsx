@@ -80,7 +80,7 @@ export const ProgramScreen = () => {
 
   return (
     <div>
-      <header><h1 className="text-lg font-extrabold">프로그램</h1><p className="text-sm text-dust">{latest.name} · 버전 {latest.version}{current && current.id !== latest.id ? ` (이번 주는 버전 ${current.version} 적용 중)` : ''}</p></header>
+      <header><h1 className="text-lg font-extrabold">프로그램</h1><p className="text-sm text-dust">{latest.name}, 버전 {latest.version}{current && current.id !== latest.id ? ` (이번 주는 버전 ${current.version} 적용 중)` : ''}</p></header>
       <div className="mt-3 flex gap-1" role="tablist" aria-label="요일">
         {[1, 2, 3, 4, 5, 6, 7].map((n) => (
           <button key={n} type="button" role="tab" aria-selected={wd === n} onClick={() => setWd(n)} className={cx('h-11 flex-1 rounded-lg border text-sm font-bold', wd === n ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>{WEEKDAY_KO[n]}</button>
@@ -94,7 +94,7 @@ export const ProgramScreen = () => {
           return (
             <div key={it.id} className="rounded-xl bg-steel p-3">
               <div className="flex items-start justify-between gap-2">
-                <div><div className="font-bold">{ex?.name ?? it.exerciseId}</div><div className="num text-xs text-dust">{describe(it)}{it.note ? ` · ${it.note}` : ''}</div></div>
+                <div><div className="font-bold">{ex?.name ?? it.exerciseId}</div><div className="num text-xs text-dust">{describe(it)}{it.note ? `, ${it.note}` : ''}</div></div>
                 <div className="flex shrink-0 gap-1">{it.required && <Badge>필수</Badge>}<Badge tone="info">{it.model === 'top_backoff' ? 'Top+Backoff' : it.model === 'straight_linear' ? '선형 증량' : 'Double Progression'}</Badge></div>
               </div>
               <details>

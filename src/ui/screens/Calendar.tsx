@@ -102,7 +102,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
           {preview?.ok && (
             <div className="rounded-xl bg-deck p-3">
               <div className="text-sm font-bold">미리보기: {preview.summary}</div>
-              <div className="num mt-1 text-xs text-dust">이동 {preview.counts.moved} · 면제 {preview.counts.excused} · 삭제 {preview.counts.removed}세트. 원본 계획과 달성률 분모는 그대로 보존됩니다{preview.counts.excused + preview.counts.removed > 0 ? '(조정 계획 이행률의 분모만 줄어듭니다)' : ''}.</div>
+              <div className="num mt-1 text-xs text-dust">이동 {preview.counts.moved}, 면제 {preview.counts.excused}, 삭제 {preview.counts.removed}세트. 원본 계획과 달성률 분모는 그대로 보존됩니다{preview.counts.excused + preview.counts.removed > 0 ? '(조정 계획 이행률의 분모만 줄어듭니다)' : ''}.</div>
               {preview.affected.map((a) => (
                 <div key={a.date} className="mt-3 border-t border-rail pt-2">
                   <div className="mb-1 text-sm font-bold">{fmtDateKo(a.date)}</div>
@@ -114,7 +114,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
                 return lost.length > 0 && (
                   <div className="num mt-3 border-t border-rail pt-2 text-xs">
                     <div className="mb-1 font-bold text-dust">이번 주 근육군별 예정 세트 변화(가중)</div>
-                    {lost.map((m) => `${Object.fromEntries(MUSCLES)[m.muscle] ?? m.muscle} −${m.total}`).join(' · ')}
+                    {lost.map((m) => `${Object.fromEntries(MUSCLES)[m.muscle] ?? m.muscle} −${m.total}`).join(', ')}
                   </div>
                 );
               })()}
@@ -229,7 +229,7 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
         <ul className="divide-y divide-rail rounded-xl bg-steel px-3">
           {changes.map((c) => (
             <li key={c.id} className="flex min-h-[52px] items-center justify-between gap-2 py-1.5 text-sm">
-              <div className="min-w-0"><div className={cx(c.undoneAt && 'text-dust line-through')}>{c.summary}</div><div className="num text-xs text-dust">{fmtDateKo(c.createdAt.slice(0, 10))} · {REASONS.find((r) => r[0] === c.reason)?.[1]}{c.note ? ` · ${c.note}` : ''}</div></div>
+              <div className="min-w-0"><div className={cx(c.undoneAt && 'text-dust line-through')}>{c.summary}</div><div className="num text-xs text-dust">{fmtDateKo(c.createdAt.slice(0, 10))}, {REASONS.find((r) => r[0] === c.reason)?.[1]}{c.note ? `, ${c.note}` : ''}</div></div>
               {c.undoneAt ? <Badge>취소됨</Badge> : c.type !== 'arm_assign' && (
                 <Btn onClick={async () => { const r = await run<number>((d, ctx) => { const u = undoChange(d, c.id, ctx); return { patch: u.patch, result: u.keptCount }; }); if (r.ok) toast(r.result ? `취소했습니다. 이미 기록한 ${r.result}세트는 그대로 두었습니다` : '변경을 취소했습니다'); }}>취소</Btn>
               )}
