@@ -1,5 +1,6 @@
 // 공용 UI 부품. 계산식·저장 로직은 두지 않는다(결과 객체만 렌더링).
 import { ReactNode, useEffect, useId, useRef, useState } from 'react';
+import { m } from 'motion/react';
 
 export const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(' ');
 
@@ -11,7 +12,7 @@ export const Btn = ({ kind = 'ghost', className, ...p }: React.ButtonHTMLAttribu
     type="button"
     {...p}
     className={cx(
-      'press inline-flex min-h-[42px] min-w-[42px] items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold select-none',
+      'press inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold select-none',
       kind === 'primary' && 'bg-p15 text-iron',
       kind === 'ghost' && 'bg-deck',
       kind === 'quiet' && 'text-dust',
@@ -21,12 +22,17 @@ export const Btn = ({ kind = 'ghost', className, ...p }: React.ButtonHTMLAttribu
   />
 );
 
+/** 접혀 있던 내용이 펼쳐질 때: 4px 아래로 내려오며 나타남, 160ms. 자주 쓰는 동작이라 짧게 */
+export const Reveal = ({ children, className }: { children: ReactNode; className?: string }) => (
+  <m.div className={className} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}>{children}</m.div>
+);
+
 /** 보조 동작용 작은 버튼. 밑줄 텍스트 링크 대신 쓴다 */
 export const Chip = ({ className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
   <button
     type="button"
     {...p}
-    className={cx('press inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md bg-deck px-2.5 text-[12px] font-semibold text-chalk/85 select-none disabled:opacity-40', className)}
+    className={cx('press hit inline-flex h-9 shrink-0 items-center justify-center gap-1 rounded-lg bg-deck px-3 text-[12.5px] font-semibold text-chalk/85 select-none disabled:opacity-40', className)}
   />
 );
 
@@ -34,7 +40,7 @@ export const Chip = ({ className, ...p }: React.ButtonHTMLAttributes<HTMLButtonE
 export const Badge = ({ tone = 'mute', children }: { tone?: 'mute' | 'ok' | 'warn' | 'bad' | 'info'; children: ReactNode }) => (
   <span className={cx(
     'inline-flex shrink-0 items-center self-start rounded-md px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap',
-    tone === 'mute' && 'bg-rail text-dust', tone === 'ok' && 'bg-p10/20 text-p10', tone === 'warn' && 'bg-p15/20 text-p15',
+    tone === 'mute' && 'bg-deck text-dust', tone === 'ok' && 'bg-p10/20 text-p10', tone === 'warn' && 'bg-p15/20 text-p15',
     tone === 'bad' && 'bg-p25/20 text-p25', tone === 'info' && 'border border-rail text-dust',
   )}>{children}</span>
 );

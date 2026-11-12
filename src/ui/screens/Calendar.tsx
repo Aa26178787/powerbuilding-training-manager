@@ -167,7 +167,7 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
         <h1 className="text-lg font-extrabold">캘린더</h1>
         <div className="flex shrink-0 rounded-lg bg-steel p-0.5 whitespace-nowrap" role="tablist" aria-label="보기">
           {(['week', 'month'] as const).map((m) => (
-            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`press h-9 rounded-md px-3 text-[13px] font-semibold ${mode === m ? 'bg-deck text-chalk' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
+            <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`press hit h-9 rounded-md px-3 text-[13px] font-semibold ${mode === m ? 'bg-deck text-chalk' : 'text-dust'}`}>{m === 'week' ? '주간' : '월간'}</button>
           ))}
         </div>
       </header>

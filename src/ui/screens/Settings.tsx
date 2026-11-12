@@ -63,14 +63,14 @@ const PlateStockEditor = ({ db }: { db: Db }) => {
         {stock.map((p, i) => (
           <li key={p.kg} className="flex min-h-[48px] items-center gap-3">
             <span aria-hidden className="h-6 w-2 shrink-0 rounded-sm" style={{ background: PLATE_COLOR[String(p.kg)] ?? '#6b7280', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.18)' }} />
-            <span className={`num-d w-14 text-[17px] ${p.pairs === 0 ? 'text-knurl line-through' : ''}`}>{p.kg}kg</span>
-            <span className="flex flex-1 items-center justify-end gap-1.5">
-              <button type="button" className="press flex h-10 w-10 items-center justify-center rounded-lg bg-deck disabled:opacity-40" aria-label={`${p.kg}kg 한 쌍 빼기`} disabled={p.pairs === null || p.pairs === 0} onClick={() => setPairs(i, Math.max(0, (p.pairs ?? 0) - 1))}><Minus size={16} aria-hidden /></button>
-              <input className="field num h-10 w-20 text-center" type="number" inputMode="numeric" min={0} max={20} aria-label={`${p.kg}kg 보유 쌍 수`} placeholder="제한 없음"
+            <span className={`num-d w-12 text-[17px] ${p.pairs === 0 ? 'text-knurl line-through' : ''}`}>{p.kg}kg</span>
+            <span className="flex flex-1 items-center justify-end gap-1">
+              <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg bg-deck disabled:opacity-40" aria-label={`${p.kg}kg 한 쌍 빼기`} disabled={p.pairs === null || p.pairs === 0} onClick={() => setPairs(i, Math.max(0, (p.pairs ?? 0) - 1))}><Minus size={16} aria-hidden /></button>
+              <input className="field num h-11 w-16 text-center" type="number" inputMode="numeric" min={0} max={20} aria-label={`${p.kg}kg 보유 쌍 수`} placeholder="제한 없음"
                 value={p.pairs ?? ''} onChange={(e) => { const v = e.target.value; if (v === '') { setPairs(i, null); return; } const n = Math.floor(Number(v)); if (n >= 0 && n <= 20) setPairs(i, n); }} />
-              <button type="button" className="press flex h-10 w-10 items-center justify-center rounded-lg bg-deck disabled:opacity-40" aria-label={`${p.kg}kg 한 쌍 더하기`} disabled={p.pairs !== null && p.pairs >= 20} onClick={() => setPairs(i, (p.pairs ?? 0) + 1)}><Plus size={16} aria-hidden /></button>
-              <span className="w-5 text-xs text-dust">쌍</span>
-              <button type="button" className="press flex h-10 w-8 items-center justify-center rounded-lg text-dust" aria-label={`${p.kg}kg 원판 목록에서 지우기`} onClick={() => save(stock.filter((_, j) => j !== i))}><X size={16} aria-hidden /></button>
+              <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg bg-deck disabled:opacity-40" aria-label={`${p.kg}kg 한 쌍 더하기`} disabled={p.pairs !== null && p.pairs >= 20} onClick={() => setPairs(i, (p.pairs ?? 0) + 1)}><Plus size={16} aria-hidden /></button>
+              <span className="w-4 text-xs text-dust">쌍</span>
+              <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" aria-label={`${p.kg}kg 원판 목록에서 지우기`} onClick={() => save(stock.filter((_, j) => j !== i))}><X size={16} aria-hidden /></button>
             </span>
           </li>
         ))}

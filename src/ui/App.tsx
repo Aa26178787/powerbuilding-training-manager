@@ -158,7 +158,7 @@ export const App = () => {
             onDragEnd={(_, i) => { if (Math.abs(i.offset.x) > 80 || Math.abs(i.velocity.x) > 500) dismissToast(); }}>
             <span className="min-w-0">{toast.text}</span>
             {toast.action ? <button type="button" className="press h-10 shrink-0 rounded-lg px-3 text-[14px] font-bold" style={{ background: 'color-mix(in srgb, currentColor 10%, transparent)' }} onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</button>
-              : <button type="button" className="press flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" aria-label="알림 닫기" onClick={dismissToast}><X size={16} aria-hidden /></button>}
+              : <button type="button" className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" aria-label="알림 닫기" onClick={dismissToast}><X size={16} aria-hidden /></button>}
           </m.div>
         )}
       </AnimatePresence>

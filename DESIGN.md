@@ -107,3 +107,18 @@ Motion(motion.dev) 하나만 쓴다. 사용자 동작에만 반응, 300ms 미만
 - 카드 안의 카드, 왼쪽 색 줄무늬, 장식용 점
 - 파란 글자(링크처럼 보임)
 - 기록이 없는 숫자를 지어내기
+
+## Verification (scripts/ui-audit.py)
+
+`npm run preview` 다음 `python3 scripts/ui-audit.py <ARM json> dark|light`로 12개 화면을 Pixel 7 크기에서 잰다.
+기준은 impeccable audit, Vercel web-design-guidelines, taste-skill 체크리스트에서 측정 가능한 항목만 골랐다.
+
+- 글자 대비 4.5:1 이상(24px 이상·굵은 19px 이상은 3:1). Knurl `#868b95`, No-lift `#ee6450`은 이 기준에 맞춰 올린 값
+- 누르는 영역 44px 이상. 보이는 크기를 줄일 때는 `.hit`로 누르는 영역만 넓힌다
+  - 예외: RPE 9칸(폭 39px, 높이 44px, 간격 4px)은 WCAG 2.5.8 간격 예외로 둔다
+- 가로 넘침 없음, 말줄임 없이 잘리는 글자 없음, 이름 없는 버튼 없음, 콘솔 오류 없음
+- 어두운·밝은 테마 둘 다 확인
+
+## Brand
+
+앱 아이콘은 바벨 옆모습: 가운데 봉, 칼라, 안쪽 25kg(빨강), 바깥 20kg(파랑). 바탕 Iron.

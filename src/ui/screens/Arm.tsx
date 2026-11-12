@@ -173,13 +173,14 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
       <SectionTitle>운영 방식</SectionTitle>
       <div className="rounded-xl bg-steel px-3 py-1">
         <Row label="주간 횟수">
-          <div className="flex gap-1">{([3, 2] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armMode === m} onClick={() => void run(() => ({ settings: { armMode: m } }))} className={cx('h-10 rounded-lg border px-3 font-semibold', db.settings.armMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>주 {m}일</button>)}</div>
+          <div className="flex gap-1">{([3, 2] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armMode === m} onClick={() => void run(() => ({ settings: { armMode: m } }))} className={cx('h-11 rounded-lg border px-3 font-semibold', db.settings.armMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>주 {m}일</button>)}</div>
         </Row>
-        <Row label="기본 요일">
-          <div className="flex gap-1">{[1, 2, 3, 4, 5, 6, 7].map((n) => <button key={n} type="button" aria-pressed={prefer.includes(n)} onClick={() => toggleWd(n)} className={cx('h-10 w-9 rounded-lg border text-sm', prefer.includes(n) ? 'border-p15 bg-p15/15 font-bold' : 'border-rail text-dust')}>{WEEKDAY_KO[n]}</button>)}</div>
-        </Row>
+        <div className="py-2">
+          <div className="text-sm text-dust">기본 요일</div>
+          <div className="mt-1.5 grid grid-cols-7 gap-1">{[1, 2, 3, 4, 5, 6, 7].map((n) => <button key={n} type="button" aria-pressed={prefer.includes(n)} onClick={() => toggleWd(n)} className={cx('h-11 min-w-0 rounded-lg border text-sm', prefer.includes(n) ? 'border-p15 bg-p15/15 font-bold' : 'border-rail text-dust')}>{WEEKDAY_KO[n]}</button>)}</div>
+        </div>
         <Row label="팔 기록">
-          <div className="flex gap-1">{(['separate', 'both'] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armSideMode === m} onClick={() => void run(() => ({ settings: { armSideMode: m } }))} className={cx('h-10 rounded-lg border px-3 text-sm font-semibold', db.settings.armSideMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>{m === 'separate' ? '좌·우 따로' : '한 번에'}</button>)}</div>
+          <div className="flex gap-1">{(['separate', 'both'] as const).map((m) => <button key={m} type="button" aria-pressed={db.settings.armSideMode === m} onClick={() => void run(() => ({ settings: { armSideMode: m } }))} className={cx('h-11 rounded-lg border px-3 text-sm font-semibold', db.settings.armSideMode === m ? 'border-p15 bg-p15/15' : 'border-rail text-dust')}>{m === 'separate' ? '좌·우 따로' : '한 번에'}</button>)}</div>
         </Row>
         {db.settings.armMode === 2 && <p className="pb-2 text-xs text-dust">주 2일 모드에서도 운동을 지우거나 처방을 합치지 않습니다. Day를 순서대로 주 2회 배정하고, 넘길 Day가 있으면 위에서 직접 건너뛰세요.</p>}
       </div>
@@ -192,7 +193,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
             const d = Object.values(db.plannedSets).find((s) => s.workoutId === w.id && s.status !== 'removed')?.plannedDate ?? w.originalDate;
             return (
               <li key={w.id} className="flex min-h-[52px] items-center justify-between gap-2 py-1.5 text-sm">
-                <button type="button" className="text-left" onClick={() => go('day', d)}><div>{w.label.replace('ARM · ', '')}</div><div className="num text-xs text-dust">{fmtDateKo(d)}{d !== w.originalDate ? ` (원래 ${fmtDateKo(w.originalDate)})` : ''}</div></button>
+                <button type="button" className="min-h-11 text-left" onClick={() => go('day', d)}><div>{w.label.replace('ARM · ', '')}</div><div className="num text-xs text-dust">{fmtDateKo(d)}{d !== w.originalDate ? ` (원래 ${fmtDateKo(w.originalDate)})` : ''}</div></button>
                 <span className="flex items-center gap-1.5"><Badge tone={st === 'completed' ? 'ok' : st === 'overdue' ? 'bad' : 'mute'}>{STATUS_LABEL[st]}</Badge>
                   {st === 'planned' && <Btn onClick={() => void run((x) => unassignArmDay(x, w.id))}>배정 취소</Btn>}</span>
               </li>
@@ -201,7 +202,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
         </ul>
       )}
 
-      <SectionTitle right={<label className="flex items-center gap-1.5 text-xs text-dust"><input type="checkbox" checked={showExcluded} onChange={(e) => setShowExcluded(e.target.checked)} />제외 항목 보기</label>}>처방 라이브러리</SectionTitle>
+      <SectionTitle right={<label className="flex min-h-11 items-center gap-2 text-xs text-dust"><input type="checkbox" className="h-5 w-5" checked={showExcluded} onChange={(e) => setShowExcluded(e.target.checked)} />제외 항목 보기</label>}>처방 라이브러리</SectionTitle>
       <div className="flex gap-2">
         <select className="field flex-1" value={selBlock} onChange={(e) => { setBlock(e.target.value); setWeek(0); }} aria-label="블록">{arm.blockOrder.map((b) => <option key={b}>{b}</option>)}</select>
         <select className="field num w-28" value={selWeek} onChange={(e) => setWeek(Number(e.target.value))} aria-label="주차">{weeks.map((w) => <option key={w} value={w}>Week {w}</option>)}</select>

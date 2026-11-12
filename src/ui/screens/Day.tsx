@@ -17,7 +17,7 @@ import {
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
 import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
-import { Badge, Btn, Chip, cx, fmtKg, PLATE_COLOR, RpePicker, Sheet, Stepper } from '../components';
+import { Badge, Btn, Chip, cx, fmtKg, PLATE_COLOR, Reveal, RpePicker, Sheet, Stepper } from '../components';
 
 const FLAG_KO: Record<IssueFlag, string> = {
   equipment_failure: '장비 문제', grip_slip: '그립 미끄러짐', j_cup_collision: 'J컵 충돌', unusual_shoes: '평소와 다른 신발',
@@ -139,12 +139,12 @@ const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop:
         </div>
         {sug.detail && <Chip onClick={() => setWhy(!why)} aria-expanded={why}>{why ? '접기' : '근거'}</Chip>}
       </div>
-      {why && sug.detail && (
+      {why && sug.detail && (<Reveal>
         <dl className="num mt-2 grid grid-cols-2 gap-x-3 rounded-lg bg-deck px-3 py-2 text-[11px] text-dust">
           {Object.entries(sug.detail).filter(([, v]) => typeof v === 'number' || typeof v === 'string').map(([k, v]) => (
             <div key={k} className="contents"><dt>{k}</dt><dd className="text-right">{typeof v === 'number' ? Math.round(v * 1000) / 1000 : String(v)}</dd></div>
           ))}
-        </dl>
+        </dl></Reveal>
       )}
       {sug.offerStop && openCount > 0 && <Btn className="mt-1.5 w-full" onClick={onStop} disabled={disabled}>남은 {openCount}세트 조기 종료</Btn>}
     </div>
@@ -201,13 +201,13 @@ const BigNumber = ({ value, onChange, onStep, step, unit, label, size = 'lg', di
   value: string; onChange: (v: string) => void; onStep: (d: number) => void; step: number; unit: string; label: string; size?: 'lg' | 'md'; disabled?: boolean;
 }) => (
   <div className="flex items-center gap-2.5">
-    <button type="button" className={cx('press flex shrink-0 items-center justify-center rounded-xl', size === 'lg' ? 'h-12 w-12 border border-rail' : 'h-10 w-10 text-dust')} disabled={disabled} onClick={() => onStep(-step)} aria-label={`${label} ${step} 줄이기`}><Minus size={18} aria-hidden /></button>
+    <button type="button" className={cx('press flex shrink-0 items-center justify-center rounded-xl', size === 'lg' ? 'h-12 w-12 border border-rail' : 'h-11 w-11 text-dust')} disabled={disabled} onClick={() => onStep(-step)} aria-label={`${label} ${step} 줄이기`}><Minus size={18} aria-hidden /></button>
     <label className="flex min-w-0 flex-1 items-baseline justify-center gap-1">
       <input className={cx('num-d w-full min-w-0 bg-transparent text-center font-bold outline-none focus-visible:rounded-lg focus-visible:bg-iron', size === 'lg' ? 'h-16 text-[60px] leading-none tracking-[-0.01em] placeholder:text-knurl' : 'h-10 text-[32px] leading-none')}
         type="number" inputMode="decimal" step="any" aria-label={label} placeholder="0" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} onFocus={(e) => e.target.select()} style={{ maxWidth: size === 'lg' ? 200 : 72 }} />
       <span className={cx('shrink-0 text-dust', size === 'lg' ? 'text-[16px]' : 'text-[14px]')}>{unit}</span>
     </label>
-    <button type="button" className={cx('press flex shrink-0 items-center justify-center rounded-xl', size === 'lg' ? 'h-12 w-12 border border-rail' : 'h-10 w-10 text-dust')} disabled={disabled} onClick={() => onStep(step)} aria-label={`${label} ${step} 늘리기`}><Plus size={18} aria-hidden /></button>
+    <button type="button" className={cx('press flex shrink-0 items-center justify-center rounded-xl', size === 'lg' ? 'h-12 w-12 border border-rail' : 'h-11 w-11 text-dust')} disabled={disabled} onClick={() => onStep(step)} aria-label={`${label} ${step} 늘리기`}><Plus size={18} aria-hidden /></button>
   </div>
 );
 
@@ -236,7 +236,7 @@ const SetStrip = ({ g, date, activeId, onEdit, labelOf, valueOf }: {
         <m.li layout="position" transition={LAYOUT} key={s.id} className={cx('min-w-0 border-t-2 pt-1.5', done ? 'border-chalk' : now ? 'border-chalk/40' : 'border-rail', done && justDone.has(s.id) && 'row-done')}>
           <div className={cx('text-[11px] leading-4', now ? 'font-semibold text-chalk' : 'text-dust')}>{labelOf(s, i)}{now ? ' 지금' : ''}</div>
           {done && perf.length ? (
-            <button type="button" className="num-d block w-full truncate text-left text-[16px] leading-6" onClick={() => onEdit({ perf: perf[0], group: g, date })} aria-label={`${labelOf(s, i)} ${perfText(perf[0])} 수정`}>{valueOf(perf)}</button>
+            <button type="button" className="hit num-d block w-full truncate text-left text-[16px] leading-6" onClick={() => onEdit({ perf: perf[0], group: g, date })} aria-label={`${labelOf(s, i)} ${perfText(perf[0])} 수정`}>{valueOf(perf)}</button>
           ) : skipped ? (
             <button type="button" className="press flex h-6 items-center gap-1 text-[12px] text-dust" onClick={() => void run((d) => unskipSet(d, s.id))} aria-label={`${labelOf(s, i)} 건너뜀 되돌리기`}><Undo2 size={13} aria-hidden />{s.status === 'skipped_by_autoregulation' ? '조기 종료' : '건너뜀'}</button>
           ) : (
@@ -325,7 +325,7 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
             <Chip className={cx(flags.length > 0 && '!bg-p25/25')} onClick={() => setShowFlags(!showFlags)} aria-expanded={showFlags}><Flag size={13} aria-hidden />{flags.length ? `태그 ${flags.length}` : '태그'}</Chip>
             <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}><SkipForward size={13} aria-hidden />이 세트 건너뛰기</Chip>
           </div>
-          {showFlags && <div className="mt-2"><FlagPicker flags={flags} onChange={setFlags} /></div>}
+          {showFlags && <Reveal className="mt-2"><FlagPicker flags={flags} onChange={setFlags} /></Reveal>}
           {warm.length > 1 && <div className="num mt-2.5 text-[12px] text-dust">워밍업 <span className="num-d text-[14px] text-chalk/80">{warm.map((x) => `${fmtKg(x.load)}×${x.reps}`).join(', ')}</span></div>}
         </div>
       )}
@@ -492,7 +492,7 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
               : <span className="h-5 w-5 rounded-full border-2 border-rail" />}
           </span>
         )}
-        <button type="button" className={cx('min-w-0 flex-1 text-left', focused && 'cursor-default')} onClick={onHeader} aria-expanded={finished ? expand : focused}>
+        <button type="button" className={cx('min-h-11 min-w-0 flex-1 text-left', focused && 'cursor-default')} onClick={onHeader} aria-expanded={finished ? expand : focused}>
           <h3 className={cx('truncate leading-tight', focused ? 'text-[20px] font-bold' : 'text-[15px] font-semibold')}>{g.instance.exerciseName}</h3>
           {focused ? (
             <div className="mt-1 flex items-baseline gap-2 text-[13px] leading-5 text-dust"><span className="shrink-0 font-semibold text-chalk/75">{role.ko}</span><span className="num-d truncate text-[15px]">{prescriptionText(g)}</span></div>
@@ -505,7 +505,7 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
           )}
         </button>
         <span className={cx('num-d shrink-0 leading-6 tabular-nums', focused ? 'text-[22px]' : 'text-[17px] text-dust', finished && 'text-chalk')}>{doneCount}<span className="text-knurl">/{g.sets.length}</span></span>
-        <button type="button" className="press -mt-2 -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-dust" onClick={() => setMenu(true)} aria-label={`${g.instance.exerciseName} 메뉴`}><Ellipsis size={20} aria-hidden /></button>
+        <button type="button" className="press -mt-2.5 -mr-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-dust" onClick={() => setMenu(true)} aria-label={`${g.instance.exerciseName} 메뉴`}><Ellipsis size={20} aria-hidden /></button>
       </div>
       {nextLine && !focused && <div className={cx('mt-1 truncate text-[12px] text-dust', 'pl-8')}>{nextLine}</div>}
       {focused && hasTags && (
@@ -529,10 +529,10 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
       )}
       {arm && g.sets.length === 0 && <ArmFill g={g} />}
       {showBody && (
-        <div className={cx(!focused && 'pl-8')}>
+        <Reveal key={focused ? 'f' : 'r'} className={cx(!focused && 'pl-8')}>
           {arm ? <ArmTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} />
             : <PbTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} />}
-        </div>
+        </Reveal>
       )}
       {menu && <CardMenu db={db} g={g} date={date} disabled={disabled} isFirst={isFirst} isLast={isLast} onEdit={onEdit} onClose={() => setMenu(false)} />}
     </section>
@@ -583,7 +583,7 @@ const RestTimer = ({ since, target, onClose }: { since: string; target: number; 
         <span className="ml-auto flex gap-1">
           <Chip className="!h-9 px-3 num-d !text-[15px]" onClick={() => setExtra(extra - 15)} aria-label="권장 시간 15초 줄이기">−15</Chip>
           <Chip className="!h-9 px-3 num-d !text-[15px]" onClick={() => setExtra(extra + 15)} aria-label="권장 시간 15초 늘리기">+15</Chip>
-          <button type="button" className="press flex h-9 w-9 items-center justify-center rounded-lg text-dust" onClick={onClose} aria-label="휴식 타이머 닫기"><X size={16} aria-hidden /></button>
+          <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={onClose} aria-label="휴식 타이머 닫기"><X size={16} aria-hidden /></button>
         </span>
       </div>
       <div className="absolute inset-x-0 top-0 h-[3px] bg-rail">
@@ -658,8 +658,8 @@ export const DayScreen = ({ date, onDate, onCalendar }: { date: ISODate; onDate:
               {here ? <><b className="font-semibold text-p10">세션 진행 중</b> <span className="text-dust">{new Date(here.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: db.settings.timezone })} 시작</span></> : session ? <span className="text-dust">이 날짜의 체중</span> : <span className="text-dust">첫 세트를 기록하면 세션이 시작됩니다</span>}
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
-              {needsBw && <button type="button" className={cx('press num h-8 rounded-lg border px-2.5', curBw ? 'border-rail' : 'border-p25 text-p25')} aria-expanded={bwOpen} onClick={() => setBwOpen(!bwOpen)}>체중 <span className="num-d text-[15px]">{curBw ? `${curBw}` : '입력'}</span></button>}
-              {here && <button type="button" className="press h-8 rounded-lg border border-rail px-2.5 font-semibold" onClick={finish} disabled={readOnly}>세션 종료</button>}
+              {needsBw && <button type="button" className={cx('press hit num h-8 rounded-lg border px-2.5', curBw ? 'border-rail' : 'border-p25 text-p25')} aria-expanded={bwOpen} onClick={() => setBwOpen(!bwOpen)}>체중 <span className="num-d text-[15px]">{curBw ? `${curBw}` : '입력'}</span></button>}
+              {here && <button type="button" className="press hit h-8 rounded-lg border border-rail px-2.5 font-semibold" onClick={finish} disabled={readOnly}>세션 종료</button>}
             </span>
           </div>
           {needsBw && (bwOpen || !curBw) && (

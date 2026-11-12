@@ -8,7 +8,7 @@ import { activeSession } from '../../application/session';
 import { armDayList } from '../../application/arm';
 import { fatigueReport } from '../../application/analysis';
 import { ensureWeeksFor, todayStr, useApp } from '../store';
-import { Badge, Btn, Chip, cx, Sheet } from '../components';
+import { Badge, Btn, Chip, cx, Reveal, Sheet } from '../components';
 import { latestE1rm } from '../../application/recommend';
 
 export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }) => {
@@ -109,7 +109,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         <div className="flex items-center justify-between gap-2">
           <div className="flex shrink-0 rounded-lg border border-rail p-0.5" role="tablist" aria-label="기간">
             {(['week', 'month'] as const).map((m) => (
-              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cx('press h-8 rounded-md px-3 text-[13px] font-semibold', mode === m ? 'bg-deck text-chalk' : 'text-dust')}>{m === 'week' ? '이번 주' : '이번 달'}</button>
+              <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={cx('press hit h-8 rounded-md px-3 text-[13px] font-semibold', mode === m ? 'bg-deck text-chalk' : 'text-dust')}>{m === 'week' ? '이번 주' : '이번 달'}</button>
             ))}
           </div>
           <span className="flex items-center">
@@ -162,7 +162,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
           {a.pb.extraSets > 0 && <Badge>계획 외 {a.pb.extraSets}세트</Badge>}
           <Chip className="ml-auto" aria-expanded={help} onClick={() => setHelp(!help)}>{help ? '설명 닫기' : '지표 설명'}</Chip>
         </div>
-        {help && <p className="mt-3 text-[12.5px] leading-[1.55] text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p>}
+        {help && <Reveal><p className="mt-3 text-[12.5px] leading-[1.55] text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p></Reveal>}
       </section>
 
       {fatigueReport(db).length > 0 && (

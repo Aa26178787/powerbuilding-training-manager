@@ -19,10 +19,10 @@
   --color-steel: #1e2024;
   --color-deck: #26292e;
   --color-rail: #2e3137;
-  --color-knurl: #5c616b;
+  --color-knurl: #868b95;
   --color-chalk: #eeece7;
   --color-dust: #9a9fa8;
-  --color-p25: #e5533f;
+  --color-p25: #ee6450;
   --color-p20: #9a9fa8;
   --color-p15: #eeece7;
   --color-p10: #eeece7;
@@ -42,7 +42,7 @@ html[data-theme="light"] {
   --color-steel: #ffffff;
   --color-deck: #f6f4ef;
   --color-rail: #d9d5cb;
-  --color-knurl: #8b8f98;
+  --color-knurl: #686d76;
   --color-chalk: #1b1f26;
   --color-dust: #5c626e;
   --color-p15: #1b1f26;
@@ -73,6 +73,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.45; }
 :focus-visible { outline: 2px solid var(--color-p15); outline-offset: 2px; }
+/* 브라우저가 그리는 부분도 색을 맞춘다: 선택 영역, 커서, 체크박스, 스크롤 막대 */
+::selection { background: color-mix(in srgb, var(--color-chalk) 28%, transparent); }
+input, textarea { caret-color: var(--color-chalk); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-chalk); }
+html { scrollbar-color: var(--color-rail) transparent; }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 }
@@ -80,8 +85,11 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 @layer components {
 /* 터치 목표 최소 44px */
 .tap { min-height: 44px; min-width: 44px; }
+/* 보이는 크기는 작게 두고 누르는 영역만 44px 이상으로 넓힌다 */
+.hit { position: relative; }
+.hit::after { content: ""; position: absolute; inset: -6px -4px; }
 .field {
-  min-height: 42px; width: 100%; border-radius: 8px; border: 1px solid var(--color-rail);
+  min-height: 44px; width: 100%; border-radius: 8px; border: 1px solid var(--color-rail);
   background: var(--color-iron); padding: 0 10px;
 }
 .field:disabled { opacity: 0.5; }
