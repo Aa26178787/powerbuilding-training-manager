@@ -6,8 +6,8 @@ import { createHash } from 'node:crypto';
 
 const dist = new URL('../dist/', import.meta.url).pathname;
 const ALLOW = /\.(html|js|css|svg|png|webmanifest|woff2)$/;
-// Pretendard 글자 묶음(약 90개)은 미리 받지 않고, 처음 쓰일 때 받아서 보관한다
-const RUNTIME_ONLY = /Pretendard/i;
+// 서체는 모두 미리 받아 둔다(본문 서체는 한 파일). 예전 Pretendard 글자 묶음 이름이 섞여 들어오면 제외
+const RUNTIME_ONLY = /PretendardVariable\.subset/i;
 const files = [];
 const walk = (dir) => {
   for (const name of readdirSync(dir)) {

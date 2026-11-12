@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* 본문 서체: Pretendard Variable(OFL)에서 KS X 1001 한글과 앱에 쓰인 글자만 남긴 파일 하나.
+   OFL의 예약 서체 이름 규정에 따라 이름을 PTM Sans로 바꿨다. scripts/subset-font.py로 다시 만든다.
+   글자 묶음 90여 개를 나눠 받던 방식은 처음 열 때·오프라인에서 일부 글자가 시스템 서체로 보이는 문제가 있었다 */
+@font-face {
+  font-family: "PTM Sans";
+  src: url("./assets/fonts/ptm-sans.woff2") format("woff2");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* DESIGN.md: 색은 원판과 경기 조명에서만 나온다.
    흰 조명(성공) = chalk: 주 버튼, 완료, 선택. 빨간 조명(실패) = p25: RPE 상한 초과에만.
    p15/p10/p20은 예전 강조색 이름을 유지한 채 chalk와 회색으로 맞췄다. 원판 색은 PLATE_COLOR에만 있다 */
@@ -18,7 +29,7 @@
   /* 그래프 계열색: 색각 구분·명도 범위를 검증한 값(어두운 배경용) */
   --color-c1: #bd8a0a;
   --color-c2: #4a86e2;
-  --font-sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --font-sans: "PTM Sans", "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
   --font-num: "Barlow Condensed", "Pretendard Variable", system-ui, sans-serif;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
