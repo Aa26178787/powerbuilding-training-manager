@@ -104,6 +104,39 @@ export const recordSet = (db: Db, i: RecordInput, ctx: Ctx): Patch => {
   return patch;
 };
 
+export interface ArmRowInput { plannedSetId: string; date: ISODate; left: number | null | undefined; right: number | null | undefined; reps?: number; seconds?: number; rpe?: number }
+
+/**
+ * ARM 세트 한 줄 기록: 왼팔·오른팔 중량을 한 번에 받아 팔별 기록을 만들고 세트를 완료 처리한다.
+ * 한쪽만 입력하면 그 팔만 기록하고, 둘 다 비우면 중량 없는 양팔 수행(밴드·맨손)으로 기록한다. undefined = 그 팔은 수행 안 함.
+ */
+export const recordArmRow = (db: Db, i: ArmRowInput, ctx: Ctx): Patch => {
+  const planned = db.plannedSets[i.plannedSetId] ?? fail('계획 세트를 찾을 수 없습니다');
+  if (planned.track !== 'arm') fail('ARM 세트가 아닙니다');
+  if (planned.status !== 'planned') fail('이미 처리된 세트입니다(중복 기록 차단)');
+  const base = { plannedSetId: planned.id, exerciseId: planned.exerciseId, date: i.date, reps: i.reps, seconds: i.seconds, rpe: i.rpe };
+  const done = livePerformed(db, (p) => p.plannedSetId === planned.id).map((p) => p.side);
+  const sides: { side: Side; weight: number | null }[] = [];
+  if (db.settings.armSideMode === 'both') sides.push({ side: 'both', weight: i.left ?? i.right ?? null });
+  else if (i.left === undefined && i.right === undefined) fail('기록할 팔이 없습니다');
+  else if (i.left === null && i.right === null && !done.length) sides.push({ side: 'both', weight: null });
+  else {
+    if (i.left !== undefined && !done.includes('L')) sides.push({ side: 'L', weight: i.left });
+    if (i.right !== undefined && !done.includes('R')) sides.push({ side: 'R', weight: i.right });
+  }
+  if (!sides.length) fail('이미 기록한 팔입니다');
+  let cur = db;
+  let patch: Patch = {};
+  for (const x of sides) {
+    const one = recordSet(cur, { ...base, side: x.side, weight: x.weight }, ctx);
+    patch = mergePatches(patch, one);
+    cur = applyPatch(cur, one);
+  }
+  // 한 팔만 수행한 경우에도 이 줄은 완료로 닫는다
+  if (cur.plannedSets[planned.id].status === 'planned') patch = mergePatches(patch, markSetDone(cur, planned.id, ctx));
+  return patch;
+};
+
 /** ARM 한팔 수행 등: 기록이 하나 이상 있는 세트를 수동으로 완료 처리 */
 export const markSetDone = (db: Db, plannedSetId: string, ctx: Ctx): Patch => {
   const s = db.plannedSets[plannedSetId] ?? fail('계획 세트를 찾을 수 없습니다');

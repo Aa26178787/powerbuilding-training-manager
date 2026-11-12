@@ -4,7 +4,7 @@ import type { ArmPrescription, Db, ISODate } from '../../domain/types';
 import { isArmOverlapExercise } from '../../domain/defaults';
 import { addDays, fmtDateKo, weekdayOf, WEEKDAY_KO } from '../../engine/dates';
 import { STATUS_LABEL } from '../../engine/status';
-import { armDayList, assignArmDay, clearArmOverride, effectiveArm, saveArmOverride, saveArmVideoLink, unassignArmDay } from '../../application/arm';
+import { armDayList, assignArmDay, assignArmDays, suggestArmDates, clearArmOverride, effectiveArm, saveArmOverride, saveArmVideoLink, unassignArmDay } from '../../application/arm';
 import { workoutStatuses } from '../../application/selectors';
 import { ArmImportResult, parseArmJson } from '../../data-import/armImport';
 import { ask, ensureWeeksFor, run, toast, todayStr, useApp } from '../store';
@@ -123,6 +123,13 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
     const r = await run((d, ctx) => assignArmDay(d, next.dayIndex, target, ctx));
     if (r.ok) { toast(`${next.block} W${next.week} D${next.day} → ${fmtDateKo(target)} 배정`); setDate(''); setAck(false); }
   };
+  const weekPlan = suggestArmDates(db, today);
+  const assignWeek = async () => {
+    if (crossesWeek && !(await ask(`이전 주차에 끝내지 않은 Day가 ${unfinished.length}개 있습니다. 그래도 다음 Day들을 배정할까요?`, '배정'))) return;
+    ensureWeeksFor(weekPlan.map((x) => x.date));
+    const r = await run((d, ctx) => assignArmDays(d, weekPlan.map((x) => ({ dayIndex: x.ref.dayIndex, date: x.date })), ctx));
+    if (r.ok) toast(`${weekPlan.length}일을 한 번에 배정했습니다`);
+  };
   const guide = Object.entries(arm.guidelines).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v as Record<string, unknown>).map(([k2, v2]) => [`${k}.${k2}`, String(v2)]) : [[k, Array.isArray(v) ? v.join(', ') : String(v)]]));
 
   return (
@@ -131,6 +138,16 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
 
       <SectionTitle>다음 Day 배정</SectionTitle>
       <div className="rounded-xl bg-steel p-4">
+        {next && weekPlan.length > 1 && (
+          <div className="mb-4 border-b border-rail pb-4">
+            <div className="text-sm font-bold">한 주 한 번에 배정</div>
+            <ul className="num mt-1 space-y-0.5 text-sm">
+              {weekPlan.map((x) => <li key={x.date} className="flex justify-between"><span>{x.ref.block} W{x.ref.week} D{x.ref.day}</span><span className="text-dust">{fmtDateKo(x.date)}</span></li>)}
+            </ul>
+            <Btn kind="primary" className="mt-2 w-full" onClick={assignWeek}>{weekPlan.length}일 한 번에 배정</Btn>
+            <p className="mt-1 text-xs text-dust">기본 요일(아래 운영 방식)에 맞춰 놓습니다. 오늘 화면에서도 ARM 요일이면 버튼 한 번으로 그날 Day를 추가할 수 있습니다.</p>
+          </div>
+        )}
         {next ? (
           <>
             <div className="text-lg font-extrabold">{next.block} <span className="num">Week {next.week} · Day {next.day}</span></div>

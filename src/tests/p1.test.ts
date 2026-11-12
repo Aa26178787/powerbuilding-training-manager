@@ -2,14 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { Db, PlannedSet } from '../domain/types';
 import { DEFAULT_MUSCLES } from '../domain/defaults';
 import { calculateWeightedMuscleSets, evaluateCoefficients, fatigueSignals, predictRpe, warmupPlan, conservativeE1RM, impliedE1RM } from '../engine';
-import { recordSet, editPerformedSet } from '../application/session';
+import { recordSet, editPerformedSet, recordArmRow } from '../application/session';
+import { assignArmDays, suggestArmDates } from '../application/arm';
+import { parseArmJson } from '../data-import/armImport';
 import { setCoefficientManually, setObservationOverride, updateLearningSettings, coefficientEvaluation } from '../application/learning';
 import { exerciseTrend, muscleDelta, muscleVolume, performedCsv } from '../application/analysis';
 import { suggestForSet } from '../application/recommend';
 import { commitChange, previewChange } from '../application/schedule';
 import { applyPatch } from '../application/ctx';
 import { ensureWeeks } from '../application/plan';
-import { makeCtx, makeDb, run, START } from './helpers';
+import { fakeArmJson, makeCtx, makeDb, run, START } from './helpers';
 
 const setsOf = (db: Db, iid: string): PlannedSet[] => Object.values(db.plannedSets).filter((s) => s.instanceId === iid).sort((a, b) => a.index - b.index);
 /** 스쿼트 한 세션: Top 5회 @topRpe, 첫 Backoff는 추천 중량으로 @boRpe */
@@ -155,5 +157,37 @@ describe('추세·피로·워밍업·CSV', () => {
     expect(csv.split('\n').length).toBe(3);
     expect(csv).toContain(`"'=SUM(A1), ""메모"""`);
     expect(csv).toContain('Chest-supported Row,pb,volume');
+  });
+});
+
+describe('ARM 빠른 입력·일괄 배정', () => {
+  const withArm = (): Db => ({ ...makeDb(), arm: parseArmJson(fakeArmJson(), 'now').data! });
+  it('기본 요일에 맞춰 한 주를 한 번에 배정', () => {
+    let db = withArm();
+    const plan = suggestArmDates(db, START);
+    expect(plan.map((p) => p.date)).toEqual(['2026-11-30', '2026-12-02']); // 합성 데이터는 Day가 2개뿐
+    db = run(db, assignArmDays(db, plan.map((p) => ({ dayIndex: p.ref.dayIndex, date: p.date })), makeCtx(START)));
+    expect(db.settings.armCursor).toBe(2);
+    expect(Object.values(db.workouts).filter((w) => w.track === 'arm').length).toBe(2);
+    expect(suggestArmDates(db, START)).toEqual([]);
+    // 수요일에 시작하면 그 주의 남은 요일만
+    expect(suggestArmDates(withArm(), '2026-12-02').map((p) => p.date)).toEqual(['2026-12-02', '2026-12-04']);
+  });
+  it('한 줄로 왼팔·오른팔을 함께 기록하면 세트 완료, 한 팔만 넣어도 완료 처리', () => {
+    let db = withArm();
+    const ctx = makeCtx(START);
+    db = run(db, assignArmDays(db, [{ dayIndex: 0, date: START }], ctx));
+    const sets = setsOf(db, 'arm:0:a-w01-d1-e01');
+    db = run(db, recordArmRow(db, { plannedSetId: sets[0].id, date: START, left: 20, right: 22.5, reps: 6, rpe: 9 }, ctx));
+    const perf = Object.values(db.performed).filter((p) => p.plannedSetId === sets[0].id);
+    expect(perf.map((p) => [p.side, p.weight]).sort()).toEqual([['L', 20], ['R', 22.5]]);
+    expect(db.plannedSets[sets[0].id].status).toBe('done');
+    expect(() => recordArmRow(db, { plannedSetId: sets[0].id, date: START, left: 20, right: 22.5, reps: 6 }, ctx)).toThrow(/중복|처리된/);
+    db = run(db, recordArmRow(db, { plannedSetId: sets[1].id, date: START, left: 20, right: undefined, reps: 6 }, ctx));
+    expect(db.plannedSets[sets[1].id].status).toBe('done');
+    expect(Object.values(db.performed).filter((p) => p.plannedSetId === sets[1].id).map((p) => p.side)).toEqual(['L']);
+    // 중량 없이(밴드·맨손) 기록
+    db = run(db, recordArmRow(db, { plannedSetId: sets[2].id, date: START, left: null, right: null, reps: 6 }, ctx));
+    expect(Object.values(db.performed).find((p) => p.plannedSetId === sets[2].id)).toMatchObject({ side: 'both', weight: null });
   });
 });

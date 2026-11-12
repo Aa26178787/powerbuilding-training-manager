@@ -7,11 +7,12 @@ import { warmupPlan } from '../../engine/warmup';
 import { dayView, DayGroupView } from '../../application/selectors';
 import { armVariantKey, lastSessionSets, suggestForSet, Suggestion } from '../../application/recommend';
 import {
-  activeSession, deletePerformedSet, editPerformedSet, endSession, markSetDone, recordSet, SessionReport,
+  activeSession, deletePerformedSet, editPerformedSet, endSession, markSetDone, recordArmRow, recordSet, SessionReport,
   setNextLoad, setSessionBodyweight, skipSets, startSession, unskipSet,
 } from '../../application/session';
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
-import { fillArmMissing, videoCategoryFor } from '../../application/arm';
+import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
+import { weekdayOf } from '../../engine/dates';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
 import { Badge, Btn, cx, Empty, fmtKg, PlateChips, RpePicker, Sheet, Stepper } from '../components';
 
@@ -202,6 +203,93 @@ const SetEntry = ({ db, g, set, date, sug, disabled }: { db: Db; g: DayGroupView
   );
 };
 
+/**
+ * ARM 빠른 입력 표: 한 줄 = 한 세트. 왼팔·오른팔 중량을 나란히 넣고 한 번 눌러 완료한다.
+ * 값은 다음 줄로 이어지므로 같은 중량이면 세트마다 한 번만 누르면 된다(실제로 누른 세트만 기록).
+ */
+const ArmTable = ({ db, g, date, disabled, onEdit }: { db: Db; g: DayGroupView; date: ISODate; disabled: boolean; onEdit: (t: EditTarget) => void }) => {
+  const separate = db.settings.armSideMode === 'separate';
+  const history = lastSessionSets(db, g.exercise.id, date, armVariantKey(db, g.instance.id));
+  const any = history.length ? history : lastSessionSets(db, g.exercise.id, date);
+  const prev = (side: Side) => any.find((p) => p.side === side || p.side === 'both')?.weight;
+  const active = g.sets.find((s) => s.status === 'planned');
+  const [left, setLeft] = useState(prev('L') != null ? String(prev('L')) : '');
+  const [right, setRight] = useState(prev('R') != null ? String(prev('R')) : '');
+  const [reps, setReps] = useState(String(active?.seconds ?? active?.reps ?? ''));
+  const [rpe, setRpe] = useState('');
+  const [busy, setBusy] = useState(false);
+  const isStatic = !!g.sets[0]?.seconds;
+  const num = (v: string): number | null => (v === '' ? null : Number(v));
+  const complete = async () => {
+    if (!active || busy) return;
+    setBusy(true);
+    const l = num(left); const r = num(right);
+    // 한쪽만 입력하면 그 팔만 수행한 것으로 기록, 둘 다 비우면 중량 없는 수행
+    const one = separate && (l === null) !== (r === null);
+    const res = await run<string[]>((d, ctx) => {
+      const patch = recordArmRow(d, { plannedSetId: active.id, date, left: one && l === null ? undefined : l, right: separate ? (one && r === null ? undefined : r) : undefined, rpe: rpe === '' ? undefined : Number(rpe), ...(isStatic ? { seconds: Number(reps) } : { reps: Number(reps) }) }, ctx);
+      return { patch, result: (patch.put?.performed ?? []).map((p) => p.id) };
+    });
+    setBusy(false);
+    if (res.ok) { haptic(); toast('세트를 기록했습니다', 'info', { label: '실행 취소', run: () => { void (async () => { for (const id of res.result) await run((d, ctx) => deletePerformedSet(d, id, ctx)); })(); } }); }
+  };
+  const open = g.sets.filter((s) => s.status === 'planned');
+  const cols = separate ? 'grid-cols-[1.6rem_1fr_1fr_3rem_3.6rem_3rem]' : 'grid-cols-[1.6rem_1fr_3rem_3.6rem_3rem]';
+  const inp = 'field num px-1 text-center';
+  return (
+    <div className="mt-2">
+      <div className={cx('grid items-center gap-1.5 text-[11px] text-dust', cols, !active && 'hidden')}>
+        <span /><span className="text-center">{separate ? '왼팔 kg' : '중량 kg'}</span>{separate && <span className="text-center">오른팔 kg</span>}<span className="text-center">{isStatic ? '초' : '회'}</span><span className="text-center">RPE</span><span />
+      </div>
+      <ul className="mt-1 space-y-1.5">
+        {g.sets.map((s, i) => {
+          const perf = g.performed[s.id] ?? [];
+          if (s.id === active?.id) {
+            return (
+              <li key={s.id} className={cx('grid items-center gap-1.5', cols)}>
+                <span className="num text-sm font-bold">{i + 1}</span>
+                <input className={inp} type="number" inputMode="decimal" step="any" aria-label={`세트 ${i + 1} ${separate ? '왼팔' : ''} 중량`} value={left} disabled={disabled} onChange={(e) => setLeft(e.target.value)} onFocus={(e) => e.target.select()} />
+                {separate && <input className={inp} type="number" inputMode="decimal" step="any" aria-label={`세트 ${i + 1} 오른팔 중량`} value={right} disabled={disabled} onChange={(e) => setRight(e.target.value)} onFocus={(e) => e.target.select()} />}
+                <input className={inp} type="number" inputMode="numeric" aria-label={`세트 ${i + 1} ${isStatic ? '유지 시간' : '반복수'}`} value={reps} disabled={disabled} onChange={(e) => setReps(e.target.value)} onFocus={(e) => e.target.select()} />
+                <select className="field num px-0.5 text-center" aria-label={`세트 ${i + 1} 실제 RPE`} value={rpe} disabled={disabled} onChange={(e) => setRpe(e.target.value)}>
+                  <option value="">—</option>{[6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <button type="button" className="tap rounded-[10px] bg-p15 text-lg font-extrabold text-[#1b1608]" disabled={disabled || busy || reps === ''} onClick={complete} aria-label={`세트 ${i + 1} 완료`}>✓</button>
+              </li>
+            );
+          }
+          return (
+            <li key={s.id} className="flex min-h-[44px] items-center gap-2 rounded-lg bg-steel px-2 text-sm [&>span:last-child]:self-center">
+              <span className="num w-5 text-dust">{i + 1}</span>
+              <span className="num flex-1">
+                {perf.length ? (
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    {perf.map((p) => (
+                      <button key={p.id} type="button" className="inline-flex h-11 items-center underline decoration-rail underline-offset-4" onClick={() => onEdit({ perf: p, group: g, date })} aria-label={`${perfText(p)} 수정`}>
+                        {p.side === 'L' ? '왼 ' : p.side === 'R' ? '오 ' : ''}{p.weight === null ? '중량 없음' : `${fmtKg(p.weight)}kg`}
+                      </button>
+                    ))}
+                    <span className="text-dust">× {perf[0].seconds ? `${perf[0].seconds}초` : `${perf[0].reps}회`}{perf[0].rpe !== undefined ? ` @${perf[0].rpe}` : ''}</span>
+                  </span>
+                ) : <span className="text-dust">{targetText(s)}</span>}
+              </span>
+              {s.status === 'done' && <Badge tone="ok">완료</Badge>}
+              {s.status === 'planned' && <Badge>대기</Badge>}
+              {(s.status === 'skipped' || s.status === 'skipped_by_autoregulation') && <button type="button" className="tap text-xs text-dust underline" onClick={() => void run((d) => unskipSet(d, s.id))}>건너뜀 · 되돌리기</button>}
+            </li>
+          );
+        })}
+      </ul>
+      {active && (
+        <div className="mt-1 flex items-center justify-between gap-2 text-xs text-dust">
+          <span>{separate ? '값은 다음 세트로 이어집니다. 한쪽만 넣으면 그 팔만 기록됩니다.' : '값은 다음 세트로 이어집니다.'}</span>
+          <button type="button" className="tap shrink-0 underline" disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, open.map((x) => x.id), false, '사용자 스킵', ctx))}>남은 {open.length}세트 건너뛰기</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ArmFill = ({ g }: { g: DayGroupView }) => {
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('');
@@ -272,6 +360,7 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, expanded, o
         </div>
       )}
       {arm && g.sets.length === 0 && <ArmFill g={g} />}
+      {arm && g.sets.length > 0 ? <ArmTable db={db} g={g} date={date} disabled={disabled} onEdit={onEdit} /> : (
       <ul className="mt-2 space-y-1">
         {g.sets.map((s, i) => {
           const perf = g.performed[s.id] ?? [];
@@ -292,8 +381,9 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, expanded, o
           );
         })}
       </ul>
+      )}
       {g.extras.length > 0 && <div className="num mt-1 text-xs text-dust">계획 외: {g.extras.map((p) => <button key={p.id} type="button" className="mr-2 underline" onClick={() => onEdit({ perf: p, group: g, date })}>{perfText(p)}</button>)}</div>}
-      {active && !expanded && <Btn className="mt-2 w-full" onClick={onExpand}>이 운동 기록하기{sug?.load != null ? ` · 추천 ${fmtKg(sug.load)}kg` : ''}</Btn>}
+      {active && !expanded && !arm && <Btn className="mt-2 w-full" onClick={onExpand}>이 운동 기록하기{sug?.load != null ? ` · 추천 ${fmtKg(sug.load)}kg` : ''}</Btn>}
       {!active && dec && dec.instanceId === g.instance.id && !arm && (
         <div className="num mt-2 text-sm"><Badge tone={dec.action === 'increase' ? 'ok' : dec.action === 'hold' || dec.action === 'not_counted' ? 'mute' : 'warn'}>다음 세션 {fmtKg(st.nextLoad)}kg</Badge> <span className="text-dust">{dec.reason}</span></div>
       )}
@@ -381,6 +471,11 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
   const restTarget = !lastSet ? 0 : lastSet.exerciseId.startsWith('arm:') ? ((lastSet.rpe ?? 0) >= 9 ? 210 : 150) : ['top', 'backoff', 'straight'].includes(lastSet.type) ? 240 : 120;
   const moreToDo = groups.some(hasOpen);
 
+  // ARM 기본 요일인데 아직 배정이 없으면 한 번 눌러 다음 Day를 배정
+  const armNext = db.arm ? armDayList(db.arm)[db.settings.armCursor] : undefined;
+  const armPrefer = db.settings.armMode === 3 ? db.settings.armWeekdays3 : db.settings.armWeekdays2;
+  const offerArm = !!armNext && date >= today && armPrefer.includes(weekdayOf(date)) && !groups.some((g) => g.instance.track === 'arm');
+
   const finish = async () => {
     if (!session) return;
     const r = await run<SessionReport>((d, ctx) => { const e = endSession(d, session.id, ctx); return { patch: e.patch, result: e.report }; });
@@ -425,6 +520,11 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
         </div>
       )}
 
+      {offerArm && armNext && (
+        <Btn className="mt-3 w-full" disabled={readOnly} onClick={async () => { const r = await run((d, ctx) => assignArmDay(d, armNext.dayIndex, date, ctx)); if (r.ok) toast(`ARM ${armNext.block} W${armNext.week} D${armNext.day}를 배정했습니다`); }}>
+          ARM 추가 — {armNext.block} W{armNext.week} D{armNext.day}
+        </Btn>
+      )}
       {groups.length === 0 && (
         <div className="mt-6"><Empty>{db.settings.programStart && date < db.settings.programStart ? `프로그램 시작일(${fmtDateKo(db.settings.programStart)}) 이전입니다.` : '이 날짜에 예정된 운동이 없습니다. 캘린더에서 다른 날의 운동을 옮겨 올 수 있습니다.'}</Empty></div>
       )}

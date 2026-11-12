@@ -2,7 +2,8 @@
 // 원본 처방은 임의로 보완·합산하지 않는다. ARM RPE 9~9.5는 일반 SBD 상한 8로 덮어쓰지 않는다.
 import type { ArmData, ArmOverride, ArmPrescription, Db, Exercise, ISODate, Patch, PlannedSet, PrescriptionInstance, ScheduleChange, Workout } from '../domain/types';
 import { isArmOverlapExercise } from '../domain/defaults';
-import { Ctx, fail } from './ctx';
+import { Ctx, applyPatch, fail, mergePatches } from './ctx';
+import { addDays, weekdayOf } from '../engine/dates';
 
 export interface ArmDayRef { dayIndex: number; block: string; week: number; day: number }
 
@@ -84,6 +85,32 @@ export const assignArmDay = (db: Db, dayIndex: number, date: ISODate, ctx: Ctx):
     put: { workouts: [workout], instances, plannedSets: sets, exercises, changes: [change] },
     settings: { armCursor: Math.max(db.settings.armCursor, dayIndex + 1) },
   };
+};
+
+/** 기본 요일 기준으로 다음 ARM Day들을 놓을 날짜 제안: 오늘 이후, 아직 ARM이 없는 날, 이번 주에 자리가 없으면 다음 주 */
+export const suggestArmDates = (db: Db, today: ISODate): { ref: ArmDayRef; date: ISODate }[] => {
+  if (!db.arm) return [];
+  const days = armDayList(db.arm);
+  const prefer = db.settings.armMode === 3 ? db.settings.armWeekdays3 : db.settings.armWeekdays2;
+  const taken = new Set(Object.values(db.plannedSets).filter((s) => s.track === 'arm' && s.status !== 'removed').map((s) => s.plannedDate));
+  const monday = addDays(today, 1 - weekdayOf(today));
+  const pick = (start: ISODate) => [0, 1, 2, 3, 4, 5, 6].map((n) => addDays(start, n)).filter((d) => d >= today && prefer.includes(weekdayOf(d)) && !taken.has(d));
+  let dates = pick(monday);
+  if (!dates.length) dates = pick(addDays(monday, 7));
+  return dates.map((date, i) => ({ ref: days[db.settings.armCursor + i], date })).filter((x) => x.ref);
+};
+
+/** 여러 Day를 한 번에 배정(각 Day는 독립된 스냅샷으로 생성, 처방을 합치지 않음) */
+export const assignArmDays = (db: Db, plan: { dayIndex: number; date: ISODate }[], ctx: Ctx): Patch => {
+  if (!plan.length) fail('배정할 Day가 없습니다');
+  let cur = db;
+  let patch: Patch = {};
+  for (const p of plan) {
+    const one = assignArmDay(cur, p.dayIndex, p.date, ctx);
+    patch = mergePatches(patch, one);
+    cur = applyPatch(cur, one);
+  }
+  return patch;
 };
 
 /** 아직 아무것도 기록하지 않은 ARM Day 배정 취소(커서를 되돌려 다시 배정 가능) */
