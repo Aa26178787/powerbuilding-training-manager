@@ -1,5 +1,5 @@
 // 설정·데이터: 프로필, 기준 기록, 증량 단위, 백업·복원, 저장소 상태
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Db, ExerciseState, ISODate, Patch } from '../../domain/types';
 import { fmtDateKo, isISODate, weekStart } from '../../engine/dates';
 import { minBarbellStep, PlateStock } from '../../engine/rounding';
@@ -80,6 +80,36 @@ const PlateStockEditor = ({ db }: { db: Db }) => {
         <Chip className="!h-11 px-4" disabled={!kg} onClick={add}>추가</Chip>
       </div>
     </div>
+  );
+};
+
+/** 서체 진단: 기기마다 웹 서체가 적용되는지 확인용. 결과를 화면에 그대로 보여 준다 */
+const FontStatus = () => {
+  const [rows, setRows] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    const probe = async () => {
+      const tries = await Promise.allSettled([document.fonts.load('400 16px "PTM Sans"', '가1'), document.fonts.load('600 16px "Barlow Condensed"', '1')]);
+      const faces = [...document.fonts].map((f) => `${f.family.replace(/"/g, '')} ${f.weight}: ${f.status === 'loaded' ? '불러옴' : f.status === 'error' ? '실패' : f.status === 'loading' ? '받는 중' : '아직 안 씀'}`);
+      const ua = navigator.userAgent.match(/SamsungBrowser\/[\d.]+|Chrome\/[\d]+|Firefox\/[\d]+|Version\/[\d.]+ Mobile/)?.[0] ?? '알 수 없음';
+      const out = [
+        `브라우저 ${ua}`,
+        `본문 서체 확인 ${document.fonts.check('16px "PTM Sans"', '가') ? '적용' : '미적용'}`,
+        `숫자 서체 확인 ${document.fonts.check('600 16px "Barlow Condensed"', '1') ? '적용' : '미적용'}`,
+        `불러오기 ${tries.map((t) => (t.status === 'fulfilled' ? `${t.value.length}개` : `오류 ${String(t.reason).slice(0, 40)}`)).join(', ')}`,
+        `서비스 워커 ${navigator.serviceWorker?.controller ? '사용 중' : '없음'}`,
+        ...faces,
+      ];
+      if (live) setRows(out);
+    };
+    void probe();
+    return () => { live = false; };
+  }, []);
+  return (
+    <details className="mt-3 text-[12px] text-dust">
+      <summary className="press hit mx-auto flex h-9 w-fit cursor-pointer list-none items-center rounded-lg bg-deck px-3 font-semibold text-chalk/85 [&::-webkit-details-marker]:hidden">서체 상태 보기</summary>
+      <ul className="num mt-2 space-y-0.5 text-center">{(rows ?? ['확인 중']).map((r) => <li key={r}>{r}</li>)}</ul>
+    </details>
   );
 };
 
@@ -247,6 +277,7 @@ export const SettingsScreen = () => {
       <SectionTitle>초기화</SectionTitle>
       <Btn kind="danger" className="w-full" onClick={async () => { if (await ask('이 기기의 모든 기록·계획·ARM 데이터를 지웁니다. 되돌릴 수 없습니다. 먼저 백업했는지 확인하세요.', '모두 지우기')) void wipeAll(); }}>모든 데이터 지우기</Btn>
       <p className="mt-6 text-center text-xs text-dust">Powerbuilding Training Manager<br />빌드 {__BUILD_ID__}. 외부 분석·추적 스크립트를 쓰지 않습니다.</p>
+      <FontStatus />
     </div>
   );
 };

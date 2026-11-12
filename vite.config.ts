@@ -11,8 +11,23 @@ const csp = (): Plugin => ({
   apply: (_, env) => env.command === 'build' && !process.env.VITE_PREVIEW,
   transformIndexHtml: (html) => html.replace(
     '<meta name="referrer"',
-    `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />\n    <meta name="referrer"`,
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />\n    <meta name="referrer"`,
   ),
+});
+
+// 서체를 HTML에서 먼저 받기 시작하게 한다(CSS를 읽은 뒤에야 받는 지연을 없앰)
+const preloadFonts = (): Plugin => ({
+  name: 'ptm-preload-fonts',
+  apply: 'build',
+  transformIndexHtml: {
+    order: 'post',
+    handler: (html, ctx) => {
+      if (!ctx.bundle) return html;
+      const files = Object.keys(ctx.bundle).filter((f) => /ptm-sans.*\.woff2$|barlow-condensed-latin-(600|700).*\.woff2$/.test(f));
+      const links = files.map((f) => `<link rel="preload" href="./${f}" as="font" type="font/woff2" crossorigin />`).join('\n    ');
+      return html.replace('</head>', `    ${links}\n  </head>`);
+    },
+  },
 });
 
 // 상대 경로 배포(정적 호스팅 하위 폴더)도 가능하도록 base를 './'로 둔다.
@@ -22,6 +37,6 @@ const BUILD_ID = new Date().toISOString().slice(0, 16).replace('T', ' ');
 export default defineConfig({
   base: './',
   define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
-  plugins: [react(), tailwindcss(), csp()],
+  plugins: [react(), tailwindcss(), csp(), preloadFonts()],
   test: { environment: 'node', include: ['src/tests/**/*.test.ts'] },
 });
