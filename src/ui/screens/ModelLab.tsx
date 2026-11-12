@@ -29,10 +29,10 @@ export const ModelLabScreen = () => {
       <SectionTitle>학습 설정</SectionTitle>
       <div className="rounded-xl bg-steel px-3 py-1">
         <Row label="자동 학습"><label className="-mr-2 flex h-11 w-11 items-center justify-center"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="자동 학습" checked={s.emaEnabled} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { emaEnabled: e.target.checked }, ctx))} /></label></Row>
-        <Row label="학습률 λ — SBD·딥스·풀업">
+        <Row label="학습률 λ (SBD, 딥스, 풀업)">
           <select className="field num w-24" value={s.ema.lambdaStrength} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { lambdaStrength: Number(e.target.value) }, ctx))}>{[0.05, 0.1, 0.15, 0.2, 0.3].map((n) => <option key={n} value={n}>{n}</option>)}</select>
         </Row>
-        <Row label="학습률 λ — Variation">
+        <Row label="학습률 λ (변형 종목)">
           <select className="field num w-24" value={s.ema.lambdaVariation} onChange={(e) => void run((d, ctx) => updateLearningSettings(d, { lambdaVariation: Number(e.target.value) }, ctx))}>{[0.05, 0.1, 0.15, 0.2].map((n) => <option key={n} value={n}>{n}</option>)}</select>
         </Row>
         <Row label="1회 관측 제한폭">
@@ -43,7 +43,7 @@ export const ModelLabScreen = () => {
 
       <SectionTitle>종목</SectionTitle>
       <select className="field" value={sel.id} onChange={(e) => setExId(e.target.value)} aria-label="종목 선택">
-        {learnable.map((e) => <option key={e.id} value={e.id}>{e.name} — k {f3(db.exStates[e.id]?.k ?? 1)}</option>)}
+        {learnable.map((e) => <option key={e.id} value={e.id}>{e.name} (k {f3(db.exStates[e.id]?.k ?? 1)})</option>)}
       </select>
 
       <div className="mt-2 rounded-xl bg-steel p-3">
@@ -105,7 +105,7 @@ export const ModelLabScreen = () => {
       <SectionTitle>RPE 환산표 (RTS)</SectionTitle>
       <div className="overflow-x-auto rounded-xl bg-steel p-2">
         <table className="w-full text-center">
-          <caption className="pb-1 text-left text-[11px] text-dust">1RM 대비 % — 행은 반복수, 열은 RPE. 모든 중량 추천과 e1RM이 이 표를 씁니다(Top Set e1RM은 RPE를 0.5 높게 보는 보수화 적용). 12회 초과는 Epley 비율로 이어 붙입니다. 계산식 {FORMULA_VERSION}.</caption>
+          <caption className="pb-1 text-left text-[11px] text-dust">1RM 대비 %. 행은 반복수, 열은 RPE입니다. 중량 추천과 e1RM 계산이 모두 이 표를 씁니다. Top Set e1RM은 RPE를 0.5 높게 봅니다. 12회를 넘으면 Epley 비율로 이어 붙입니다. 계산식 {FORMULA_VERSION}.</caption>
           <thead><tr className="text-[11px] text-dust"><th className="py-1 font-normal">회</th>{[10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6].map((p) => <th key={p} className="num-d py-1 text-[13px] font-semibold">{p}</th>)}</tr></thead>
           <tbody>
             {Array.from({ length: 12 }, (_, i) => i + 1).map((r) => (

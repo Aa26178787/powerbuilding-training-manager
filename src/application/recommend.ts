@@ -43,7 +43,7 @@ const seedStart = (db: Db, ex: Exercise, reps: number, rpe: number, bw: number |
   const off = ex.loadMode === 'bodyweight_plus' ? (bw ?? 0) : 0;
   const raw = Math.max(0, loadForTarget(e1rm * (db.exStates[ex.id]?.k ?? 1), reps, rpe) - off);
   const load = roundLoad(raw, ex.increment, ex.rounding);
-  return { load, kind: 'top_start', message: `기준 기록 e1RM ${e1rm.toFixed(1)}kg → ${reps}회 @${rpe}`, detail: { formulaVersion: FORMULA_VERSION, e1rm, reps, rpe, raw, rounded: load, increment: ex.increment } };
+  return { load, kind: 'top_start', message: `기준 기록 e1RM ${e1rm.toFixed(1)}kg에서 ${reps}회 @${rpe}로 계산`, detail: { formulaVersion: FORMULA_VERSION, e1rm, reps, rpe, raw, rounded: load, increment: ex.increment } };
 };
 
 /** 예정 세트 하나에 대한 추천 중량. 추천은 제안일 뿐 실제 기록을 덮어쓰지 않는다 */
@@ -51,7 +51,7 @@ export const suggestForSet = (db: Db, set: PlannedSet, sessionDate: ISODate): Su
   const ex = db.exercises[set.exerciseId];
   const inst = db.instances[set.instanceId];
   if (!ex || !inst) return { load: null, kind: 'none', message: '' };
-  if (inst.model === 'arm_manual') return { load: null, kind: 'none', message: 'ARM은 자동 추천 없음 — PDF 처방과 지난 기록을 참고해 직접 결정' };
+  if (inst.model === 'arm_manual') return { load: null, kind: 'none', message: 'ARM은 자동 추천이 없습니다. PDF 처방과 지난 기록을 보고 정하세요' };
   const st = db.exStates[ex.id];
   const bw = ex.loadMode === 'bodyweight_plus' ? bodyweightFor(db, sessionDate) : null;
   if (ex.loadMode === 'bodyweight_plus' && !bw) return { load: null, kind: 'none', message: '체중을 입력하면 추천 중량을 계산합니다' };
@@ -64,7 +64,7 @@ export const suggestForSet = (db: Db, set: PlannedSet, sessionDate: ISODate): Su
 
   if (set.type === 'top') {
     if (st?.nextLoad != null) return { load: st.nextLoad, kind: 'progression', message: st.lastDecision?.reason ?? '지난 세션 기준 추천' };
-    return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록 없음 — 워밍업 후 직접 입력' };
+    return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록이 없습니다. 워밍업하며 중량을 정하세요' };
   }
   if (set.type === 'backoff') {
     const top = done.find((p) => p.type === 'top');
@@ -74,7 +74,7 @@ export const suggestForSet = (db: Db, set: PlannedSet, sessionDate: ISODate): Su
     if (!lastBo || lastBo.weight === null || lastBo.rpe === undefined) {
       try {
         const r = recommendBackoff({ topWeight: top.weight, topReps: top.reps, topRpe: top.rpe, backoffReps: targetReps, backoffTargetRpe: targetRpe, k: st?.k ?? 1, increment: ex.increment, rounding: ex.rounding, bodyweight: bwArg });
-        return { load: r.rounded, kind: 'backoff', message: `Top ${top.weight}kg×${top.reps} @${top.rpe} → 보수적 e1RM ${r.e1rmConservative.toFixed(1)}kg → ${targetReps}회 @${targetRpe}`, detail: { ...r, inputs: { ...r.inputs } } };
+        return { load: r.rounded, kind: 'backoff', message: `Top ${top.weight}kg×${top.reps} @${top.rpe} 기준, 보수적 e1RM ${r.e1rmConservative.toFixed(1)}kg로 ${targetReps}회 @${targetRpe} 계산`, detail: { ...r, inputs: { ...r.inputs } } };
       } catch (e) {
         return { load: null, kind: 'none', message: (e as Error).message };
       }
@@ -89,18 +89,18 @@ export const suggestForSet = (db: Db, set: PlannedSet, sessionDate: ISODate): Su
     return { load: a.load, kind: 'next_set', message: a.reason, offerStop: a.offerStop, action: a.action, detail: { ...a } };
   }
   if (st?.nextLoad != null) return { load: st.nextLoad, kind: 'progression', message: st.lastDecision?.reason ?? '지난 세션 기준 추천' };
-  if (set.type === 'straight') return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록 없음 — 워밍업 후 직접 입력' };
+  if (set.type === 'straight') return seedStart(db, ex, targetReps, targetRpe, bw) ?? { load: null, kind: 'none', message: '기록이 없습니다. 워밍업하며 중량을 정하세요' };
   if (ex.variationOf) {
     const comp = latestE1rm(db, ex.variationOf.compExerciseId);
     if (comp !== null) {
       const r = variationStartLoad(comp, ex.variationOf.kBase, st?.k ?? 1, targetReps, targetRpe, ex.increment, ex.rounding);
-      return { load: r.rounded, kind: 'variation_start', message: `Comp e1RM ${comp.toFixed(1)}kg × ${ex.variationOf.kBase} → ${targetReps}회 @${targetRpe} (첫 수행 시작값)`, detail: { ...r, compE1rm: comp, kBase: ex.variationOf.kBase } };
+      return { load: r.rounded, kind: 'variation_start', message: `첫 수행 시작값. 본종목 e1RM ${comp.toFixed(1)}kg × ${ex.variationOf.kBase}로 ${targetReps}회 @${targetRpe} 계산`, detail: { ...r, compE1rm: comp, kBase: ex.variationOf.kBase } };
     }
   }
   const prev = livePerformed(db, (p) => p.exerciseId === ex.id && p.weight !== null && p.type !== 'warmup');
   const lp = prev[prev.length - 1];
   if (lp) return { load: lp.weight, kind: 'progression', message: `지난 기록 ${lp.weight}kg×${lp.reps ?? '-'}` };
-  return { load: null, kind: 'none', message: '기록 없음 — 첫 세션에서 RPE에 맞춰 직접 설정' };
+  return { load: null, kind: 'none', message: '기록이 없습니다. 첫 세션은 목표 RPE에 맞춰 중량을 정하세요' };
 };
 
 /** 같은 운동의 직전 세션 기록(카드의 '지난 기록' 표시용) */

@@ -39,10 +39,10 @@ export const decideProgression = (i: ProgressionInput): ProgressionResult => {
   if (!decisive.length) return { action: 'not_counted', nextLoad: null, failStreak: i.prevFailStreak, reason: '판정할 작업 세트 기록이 없습니다' };
   const used = decisive[0].weight as number;
   if (decisive.some((s) => s.flags.some((f) => EQUIPMENT_FLAGS.includes(f)))) {
-    return { action: 'not_counted', nextLoad: used, failStreak: i.prevFailStreak, reason: '장비 문제 세트 — 근력 실패로 계산하지 않고 중량 유지' };
+    return { action: 'not_counted', nextLoad: used, failStreak: i.prevFailStreak, reason: '장비 문제로 표시한 세트는 실패로 세지 않습니다. 중량 유지' };
   }
   if (decisive.some((s) => s.rpe === undefined)) {
-    return { action: 'not_counted', nextLoad: used, failStreak: i.prevFailStreak, reason: 'RPE 미입력 — 판정 보류, 중량 유지' };
+    return { action: 'not_counted', nextLoad: used, failStreak: i.prevFailStreak, reason: 'RPE가 없어 판정을 미룹니다. 중량 유지' };
   }
   const maxRpe = Math.max(...decisive.map((s) => s.rpe as number));
   const reps = decisive.map((s) => s.reps ?? 0);
@@ -56,9 +56,9 @@ export const decideProgression = (i: ProgressionInput): ProgressionResult => {
     const allDone = i.dpCriterion === 'last_set' ? decisive.length >= 1 && work.length >= i.plannedCount : work.length >= i.plannedCount;
     success = allDone && judged.every((r) => r >= top) && maxRpe <= i.rpeCap;
     failed = reps.some((r) => r < bottom) || maxRpe > i.rpeCap;
-    why = success ? `반복 상단 ${top}회 달성, RPE ${maxRpe} ≤ ${i.rpeCap} — 증량 후 ${bottom}회부터 재진행`
+    why = success ? `상단 ${top}회를 RPE ${maxRpe}로 채웠습니다(상한 ${i.rpeCap}). 올린 중량은 ${bottom}회부터 다시 시작`
       : maxRpe > i.rpeCap ? `RPE ${maxRpe}로 상한 ${i.rpeCap} 초과`
-      : reps.some((r) => r < bottom) ? `반복 하단 ${bottom}회 미달` : `반복 범위 진행 중 — 같은 중량으로 상단 ${top}회까지`;
+      : reps.some((r) => r < bottom) ? `반복 하단 ${bottom}회 미달` : `반복 범위 안에서 진행 중입니다. 같은 중량으로 ${top}회까지 채우세요`;
   } else {
     const target = i.targetReps ?? 0;
     const allDone = i.model === 'top_backoff' ? true : work.length >= i.plannedCount;
@@ -69,19 +69,19 @@ export const decideProgression = (i: ProgressionInput): ProgressionResult => {
       : !repsOk ? `목표 ${target}회 미달` : maxRpe > i.rpeCap ? `RPE ${maxRpe}로 상한 ${i.rpeCap} 초과` : '계획 세트 미완료';
   }
   if (success) {
-    return { action: 'increase', nextLoad: Math.round((used + i.increment) * 1000) / 1000, failStreak: 0, reason: `${why} — 다음 세션 +${i.increment}kg 제안` };
+    return { action: 'increase', nextLoad: Math.round((used + i.increment) * 1000) / 1000, failStreak: 0, reason: `${why}. 다음 세션 +${i.increment}kg 제안` };
   }
   if (!failed) return { action: 'hold', nextLoad: used, failStreak: i.prevFailStreak, reason: why };
   const streak = i.prevFailStreak + 1;
   if (streak >= 3) {
-    return { action: 'review', nextLoad: used, failStreak: streak, reason: `${why} — 같은 중량 3회 연속 미달. 반복수·세트 수·피로·기술을 검토하세요` };
+    return { action: 'review', nextLoad: used, failStreak: streak, reason: `${why}. 같은 중량에서 3회 연속 미달입니다. 반복수, 세트 수, 피로, 기술을 점검하세요` };
   }
   if (streak === 2) {
     const bw = i.bodyweight ?? 0;
     const reduceOptions = [2.5, 5].map((pct) => ({
       pct, load: Math.max(0, roundLoad((used + bw) * (1 - pct / 100) - bw, i.increment, 'down')),
     }));
-    return { action: 'hold_or_reduce', nextLoad: used, failStreak: streak, reason: `${why} — 2회 연속 미달. 유지 또는 2.5~5% 감량 중 선택`, reduceOptions };
+    return { action: 'hold_or_reduce', nextLoad: used, failStreak: streak, reason: `${why}. 2회 연속 미달입니다. 유지할지 2.5~5% 낮출지 고르세요`, reduceOptions };
   }
-  return { action: 'hold', nextLoad: used, failStreak: streak, reason: `${why} — 다음 세션 중량 유지` };
+  return { action: 'hold', nextLoad: used, failStreak: streak, reason: `${why}. 다음 세션도 같은 중량` };
 };

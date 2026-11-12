@@ -126,7 +126,7 @@ export const ProgramScreen = () => {
       <ul className="divide-y divide-rail rounded-xl bg-steel px-3">
         {Object.values(db.versions).sort((a, b) => b.version - a.version).map((v) => (
           <li key={v.id} className="num flex min-h-[44px] items-center justify-between gap-2 py-1.5 text-sm">
-            <span>버전 {v.version}{v.changeNote ? ` — ${v.changeNote}` : ''}</span>
+            <span>버전 {v.version}{v.changeNote ? ` ${v.changeNote}` : ''}</span>
             <span className="text-xs text-dust">{v.effectiveFrom < '2001' ? '처음부터' : `${fmtDateKo(v.effectiveFrom)} 주부터`}</span>
           </li>
         ))}

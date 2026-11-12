@@ -38,10 +38,10 @@ export const HistoryScreen = () => {
           </select>
           {ex && ex.role !== 'arm' && (
             <div className="mt-3 rounded-xl bg-steel p-3 text-sm">
-              <div className="flex items-center justify-between gap-2"><span className="text-dust">다음 세션 추천 중량</span><b className="num">{fmtKg(st?.nextLoad)}kg</b></div>
+              <div className="flex items-center justify-between gap-2"><span className="text-dust">다음 세션 추천 중량</span><b className="num">{st?.nextLoad == null ? <span className="font-normal text-dust">아직 없음</span> : `${fmtKg(st.nextLoad)}kg`}</b></div>
               {st?.lastDecision && <div className="mt-1 text-xs text-dust">{st.lastDecision.reason}{st.failStreak ? ` (연속 미달 ${st.failStreak}회)` : ''}</div>}
               <div className="mt-2 flex gap-2">
-                <input className="field num flex-1" type="number" inputMode="decimal" placeholder="직접 지정(kg) — 감량·디로드 포함" value={next} onChange={(e) => setNext(e.target.value)} />
+                <input className="field num flex-1" type="number" inputMode="decimal" placeholder="직접 지정(kg), 감량이나 디로드 포함" value={next} onChange={(e) => setNext(e.target.value)} />
                 <Btn disabled={!next} onClick={async () => { const x = await run((d, ctx) => setNextLoad(d, sel, Number(next), '사용자 지정', ctx)); if (x.ok) { setNext(''); toast('다음 세션 중량을 지정했습니다'); } }}>지정</Btn>
               </div>
             </div>
@@ -54,7 +54,7 @@ export const HistoryScreen = () => {
                 <ul className="space-y-0.5">
                   {[...sets].reverse().map((p) => (
                     <li key={p.id} className="num flex min-h-[40px] items-center justify-between gap-2 text-sm">
-                      <button type="button" className={`text-left ${p.deleted ? 'text-dust line-through' : 'underline decoration-rail underline-offset-4'}`} onClick={() => !p.deleted && open(p)}>
+                      <button type="button" className={`press min-h-[40px] flex-1 text-left ${p.deleted ? 'text-dust line-through' : ''}`} onClick={() => !p.deleted && open(p)}>
                         {p.side && p.side !== 'both' ? (p.side === 'L' ? '왼팔 ' : '오른팔 ') : ''}{p.weight === null ? '' : `${fmtKg(p.weight)}kg × `}{p.seconds ? `${p.seconds}초` : `${p.reps}회`}{p.rpe !== undefined ? ` @${p.rpe}` : ''}<span className="text-xs text-dust">{e1(p)}</span>
                       </button>
                       <span className="flex items-center gap-1">

@@ -24,10 +24,12 @@ export interface AppState {
   installed: boolean;
   /** IndexedDB를 쓸 수 없어 메모리에만 보관 중(새로고침하면 사라짐) */
   memoryOnly: boolean;
+  /** 새 버전이 내려와 다시 불러오면 적용되는 상태 */
+  updateReady: boolean;
   confirm: { message: string; okLabel: string; resolve: (ok: boolean) => void } | null;
 }
 
-let state: AppState = { db: null, save: 'idle', readOnly: false, persisted: null, toast: null, fatal: null, canInstall: false, installed: false, memoryOnly: false, confirm: null };
+let state: AppState = { db: null, save: 'idle', readOnly: false, persisted: null, toast: null, fatal: null, canInstall: false, installed: false, memoryOnly: false, confirm: null, updateReady: false };
 const listeners = new Set<() => void>();
 const set = (p: Partial<AppState>) => { state = { ...state, ...p }; listeners.forEach((l) => l()); };
 export const useApp = (): AppState => useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state);
@@ -106,6 +108,14 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvent = e as InstallPromptEvent; set({ canInstall: true }); });
   window.addEventListener('appinstalled', () => { installEvent = null; set({ canInstall: false, installed: true }); });
 }
+if (typeof window !== 'undefined') {
+  window.addEventListener('ptm-update-ready', () => {
+    // 진행 중인 세션이 없으면 바로 새 버전으로, 있으면 기록 흐름을 끊지 않도록 안내만 띄운다(세트는 이미 저장되어 있음)
+    const busy = !!state.db && Object.values(state.db.sessions).some((x) => x.status === 'in_progress');
+    if (!busy) window.location.reload(); else set({ updateReady: true });
+  });
+}
+
 export const isStandalone = (): boolean => window.matchMedia('(display-mode: standalone)').matches;
 export const promptInstall = async (): Promise<boolean> => {
   if (!installEvent) return false;

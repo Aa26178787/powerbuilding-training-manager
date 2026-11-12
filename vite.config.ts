@@ -16,8 +16,12 @@ const csp = (): Plugin => ({
 });
 
 // 상대 경로 배포(정적 호스팅 하위 폴더)도 가능하도록 base를 './'로 둔다.
+// 설정 화면에 표시할 빌드 식별자(날짜·시각) — 폰에서 새 버전이 적용됐는지 확인용
+const BUILD_ID = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
 export default defineConfig({
   base: './',
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   plugins: [react(), tailwindcss(), csp()],
   test: { environment: 'node', include: ['src/tests/**/*.test.ts'] },
 });

@@ -1,7 +1,7 @@
 // 앱 셸: 하단 탭, 저장 상태 표시, 알림
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { BicepsFlexed, CalendarDays, ChartLine, ChevronRight, Dumbbell, Ellipsis, FlaskConical, History, House, ListChecks, Settings as SettingsIcon, type LucideIcon } from 'lucide-react';
+import { BicepsFlexed, CalendarDays, ChartLine, ChevronRight, Dumbbell, Ellipsis, FlaskConical, History, House, ListChecks, Settings as SettingsIcon, X, type LucideIcon } from 'lucide-react';
 import type { ISODate } from '../domain/types';
 import { dismissToast, toast as showToast, todayStr, useApp } from './store';
 import { Btn, closeTopSheet, cx, Sheet } from './components';
@@ -35,7 +35,7 @@ const withTransition = (update: () => void) => {
 };
 
 export const App = () => {
-  const { db, save, readOnly, toast, fatal, memoryOnly, confirm } = useApp();
+  const { db, save, readOnly, toast, fatal, memoryOnly, confirm, updateReady } = useApp();
   const [tab, setTab] = useState<Tab>('home');
   const [date, setDate] = useState<ISODate>(todayStr());
   const [online, setOnline] = useState(navigator.onLine);
@@ -93,6 +93,7 @@ export const App = () => {
 
   const go = (t: string, d?: ISODate) => {
     if (t !== tab) { trail.current = [...trail.current.filter((x) => x !== t), tab].slice(-6); if (t === 'home') trail.current = []; }
+    if (t !== tab) dismissToast();
     withTransition(() => {
       if (d) setDate(d); else if (t === 'day') setDate(todayStr());
       setTab(t as Tab);
@@ -103,11 +104,17 @@ export const App = () => {
   return (
     <div className="mx-auto flex min-h-full max-w-[520px] flex-col">
       <div className="num flex items-center justify-between px-3 text-[10px] text-dust" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }} aria-live="polite">
-        <span>{!online ? '오프라인 — 기록은 이 기기에 저장됩니다' : ''}</span>
+        <span>{!online ? '오프라인. 기록은 이 기기에 저장됩니다' : ''}</span>
         <span className={cx(save === 'error' && 'font-bold text-p25')}>{save === 'saving' ? '저장 중…' : save === 'saved' ? '이 기기에 저장됨' : save === 'error' ? '저장 실패 — 다시 시도하세요' : ''}</span>
       </div>
       {import.meta.env.VITE_PREVIEW && <div className="mx-4 mt-1 rounded-lg border border-p20/60 px-3 py-2 text-xs">미리보기 화면입니다. 기록은 이 브라우저에만 임시로 남고, 설치·오프라인·백업 파일 저장은 실제 배포본에서 동작합니다.</div>}
       {memoryOnly && <div className="mx-4 mt-1 rounded-lg border border-p25/60 px-3 py-2 text-sm">이 환경에서는 저장소를 쓸 수 없어 기록이 저장되지 않습니다. 새로고침하면 사라집니다.</div>}
+      {updateReady && (
+        <div className="mx-3 mt-1 flex items-center justify-between gap-2 rounded-lg bg-deck px-3 py-1 text-[13px]">
+          <span>새 버전이 준비됐습니다. 지금까지 기록한 세트는 저장되어 있습니다.</span>
+          <Btn kind="primary" className="shrink-0 !min-h-9" onClick={() => window.location.reload()}>지금 적용</Btn>
+        </div>
+      )}
       {readOnly && <div className="mx-4 mt-1 rounded-lg border border-p15/60 px-3 py-2 text-sm">다른 탭에서 이 앱을 쓰는 중이라 이 탭은 읽기 전용입니다. 그 탭을 닫으면 여기서 기록할 수 있습니다.</div>}
       <main className="flex-1 px-3 pt-1 pb-24">
         {tab === 'home' && <HomeScreen go={go} />}
@@ -143,8 +150,8 @@ export const App = () => {
         <div key={toast.id} className="toast-in toast-pos fixed inset-x-0 z-50 mx-auto flex max-w-[496px] items-center justify-between gap-3 rounded-xl px-3 py-1 text-sm shadow-lg" role="status"
           style={{ background: toast.kind === 'error' ? 'var(--color-p25)' : 'var(--color-chalk)', color: toast.kind === 'error' ? '#fff' : 'var(--color-iron)', marginInline: 'max(12px, calc(50% - 248px))' }}>
           <span>{toast.text}</span>
-          {toast.action ? <Btn kind="quiet" className="shrink-0 !text-inherit underline" onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</Btn>
-            : <button type="button" className="tap shrink-0 text-xs underline" onClick={dismissToast}>닫기</button>}
+          {toast.action ? <Btn kind="quiet" className="!min-h-[36px] shrink-0 rounded-md bg-white/10 !text-inherit" onClick={() => { toast.action?.run(); dismissToast(); }}>{toast.action.label}</Btn>
+            : <button type="button" className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-md" aria-label="알림 닫기" onClick={dismissToast}><X size={16} /></button>}
         </div>
       )}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-rail bg-iron/95 backdrop-blur" aria-label="주요 메뉴" style={{ paddingBottom: 'env(safe-area-inset-bottom)', viewTransitionName: 'nav' }}>

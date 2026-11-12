@@ -3,7 +3,7 @@
 import type { ArmData, ArmOverride, ArmPrescription, Db, Exercise, ISODate, Patch, PlannedSet, PrescriptionInstance, ScheduleChange, Workout } from '../domain/types';
 import { isArmOverlapExercise } from '../domain/defaults';
 import { Ctx, applyPatch, fail, mergePatches } from './ctx';
-import { addDays, weekdayOf } from '../engine/dates';
+import { addDays, fmtDateKo, weekdayOf } from '../engine/dates';
 
 export interface ArmDayRef { dayIndex: number; block: string; week: number; day: number }
 
@@ -79,7 +79,7 @@ export const assignArmDay = (db: Db, dayIndex: number, date: ISODate, ctx: Ctx):
   });
   const change: ScheduleChange = {
     id: `c-${ctx.newId()}`, type: 'arm_assign', reason: 'user_choice', createdAt: ctx.now, approvedAt: ctx.now, setPatches: [],
-    createdSetIds: sets.map((s) => s.id), orderPatches: [], warnings: [], summary: `${workout.label} 배정 → ${date}`,
+    createdSetIds: sets.map((s) => s.id), orderPatches: [], warnings: [], summary: `${fmtDateKo(date)}에 ${workout.label} 배정`,
   };
   return {
     put: { workouts: [workout], instances, plannedSets: sets, exercises, changes: [change] },

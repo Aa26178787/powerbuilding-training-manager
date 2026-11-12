@@ -24,7 +24,7 @@ export const SeedEditor = ({ db, exerciseId, compact }: { db: Db; exerciseId: st
   };
   return (
     <div className="py-2">
-      <div className="mb-1 text-sm font-semibold">{ex.name}{ex.loadMode === 'bodyweight_plus' ? <span className="font-normal text-dust"> — 추가 중량</span> : null}</div>
+      <div className="mb-1 text-sm font-semibold">{ex.name}{ex.loadMode === 'bodyweight_plus' ? <span className="font-normal text-dust"> 추가 중량</span> : null}</div>
       <div className="flex items-end gap-1.5">
         {([['w', 'kg'], ['r', '회'], ['p', 'RPE']] as const).map(([k, l]) => (
           <label key={k} className="flex-1 text-[11px] text-dust">{l}<input className="field num mt-0.5 px-1 text-center" type="number" inputMode="decimal" step="any" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value })} onBlur={() => { if (compact && dirty && (v.w === '' || (v.r && v.p))) void save(); }} /></label>
@@ -90,7 +90,7 @@ export const SettingsScreen = () => {
         <Row label="홈 화면 설치">
           {installed || isStandalone() ? <Badge tone="ok">설치됨</Badge>
             : canInstall ? <Btn kind="primary" onClick={async () => { if (await promptInstall()) { toast('홈 화면에 설치했습니다'); void requestPersist(); } }}>설치</Btn>
-            : <span className="text-xs text-dust">Chrome 메뉴 ⋮ → 홈 화면에 추가</span>}
+            : <span className="text-xs text-dust">Chrome 메뉴(⋮)에서 홈 화면에 추가를 누르세요</span>}
         </Row>
         <Row label="세션 중 화면 켜 두기">
           <label className="-mr-2 flex h-11 w-11 items-center justify-center"><input type="checkbox" className="h-6 w-6 accent-[var(--color-p15)]" aria-label="세션 중 화면 켜 두기" checked={s.keepAwake} onChange={(e) => void run(() => ({ settings: { keepAwake: e.target.checked } }))} /></label>
@@ -113,7 +113,7 @@ export const SettingsScreen = () => {
         <p className="text-xs text-dust">기록은 이 기기의 브라우저에만 저장됩니다. 브라우저 데이터를 지우거나 오래 쓰지 않으면 사라질 수 있으니(특히 홈 화면에 추가하지 않은 iOS Safari) 백업 파일을 주기적으로 내보내세요.</p>
         <label className="mt-3 flex min-h-[44px] cursor-pointer items-center gap-3 text-sm">
           <input type="checkbox" className="h-5 w-5 accent-[var(--color-p15)]" checked={includeArm} disabled={!db.arm} onChange={(e) => setIncludeArm(e.target.checked)} />
-          ARM 처방 라이브러리 포함 <span className="text-xs text-dust">(저작권 자료 — 개인 보관용으로만)</span>
+          ARM 처방 라이브러리 포함 <span className="text-xs text-dust">(저작권 자료라 개인 보관용)</span>
         </label>
         <Btn kind="primary" className="w-full" onClick={exportNow}>백업 파일 내보내기</Btn>
         <Btn className="mt-2 w-full" onClick={async () => {
@@ -148,7 +148,7 @@ export const SettingsScreen = () => {
           <select className="field num w-24" value={s.barWeight} onChange={(e) => void run(() => ({ settings: { barWeight: Number(e.target.value) } }))}>{[20, 15, 10].map((n) => <option key={n} value={n}>{n}kg</option>)}</select>
         </Row>
         <div className="py-2">
-          <div className="text-sm text-dust">보유 원판 (한쪽에 끼우는 종류, kg) — 바벨 최소 증량 {minBarbellStep(s.plates)}kg</div>
+          <div className="text-sm text-dust">보유 원판(kg, 한쪽 기준). 바벨 최소 증량 {minBarbellStep(s.plates)}kg</div>
           <div className="mt-1 flex gap-1.5"><input className="field num flex-1" placeholder={s.plates.join(', ')} value={plates} onChange={(e) => setPlates(e.target.value)} />
             <Btn disabled={!plates} onClick={async () => { const list = plates.split(/[,\s]+/).map(Number).filter((n) => n > 0 && n <= 50); if (!list.length) { toast('원판 무게를 쉼표로 구분해 입력하세요', 'error'); return; } const r = await run(() => ({ settings: { plates: [...new Set(list)].sort((a, b) => b - a) } })); if (r.ok) setPlates(''); }}>저장</Btn></div>
         </div>
@@ -158,7 +158,7 @@ export const SettingsScreen = () => {
         <Row label="시간대">{s.timezone}</Row>
       </div>
 
-      <SectionTitle>기준 기록 — 첫 중량 추천에 사용</SectionTitle>
+      <SectionTitle>기준 기록</SectionTitle><p className="-mt-1 pb-2 text-xs text-dust">첫 중량 추천에 씁니다.</p>
       <div className="divide-y divide-rail rounded-xl bg-steel px-3">
         {SEED_EXERCISES.map((id) => <SeedEditor key={id} db={db} exerciseId={id} />)}
       </div>
@@ -195,12 +195,12 @@ export const SettingsScreen = () => {
         <Row label="백업 알림 주기">
           <select className="field num w-24" value={s.backupReminderDays} onChange={(e) => void run(() => ({ settings: { backupReminderDays: Number(e.target.value) } }))}>{[3, 7, 14, 30].map((n) => <option key={n} value={n}>{n}일</option>)}</select>
         </Row>
-        <p className="pb-2 text-xs text-dust">개인 보정계수와 학습 설정은 [더보기 → 모델 실험실]에서 봅니다.</p>
+        <p className="pb-2 text-xs text-dust">개인 보정계수와 학습 설정은 더보기의 모델 실험실에서 봅니다.</p>
       </div>
 
       <SectionTitle>초기화</SectionTitle>
       <Btn kind="danger" className="w-full" onClick={async () => { if (await ask('이 기기의 모든 기록·계획·ARM 데이터를 지웁니다. 되돌릴 수 없습니다. 먼저 백업했는지 확인하세요.', '모두 지우기')) void wipeAll(); }}>모든 데이터 지우기</Btn>
-      <p className="mt-6 text-center text-xs text-dust">Powerbuilding Training Manager 0.1.0 · 외부 분석·추적 스크립트 없음</p>
+      <p className="mt-6 text-center text-xs text-dust">Powerbuilding Training Manager<br />빌드 {__BUILD_ID__}. 외부 분석·추적 스크립트를 쓰지 않습니다.</p>
     </div>
   );
 };

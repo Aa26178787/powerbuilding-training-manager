@@ -2,7 +2,7 @@
 // 레퍼런스: Strong/Hevy의 세트 줄 + 체크, 지난 기록 열, 체크 후 휴식 타이머 자동 시작.
 import { useEffect, useMemo, useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
-import { Check, ChevronLeft, ChevronRight, Ellipsis, Flag, Minus, Plus, Timer } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Ellipsis, Flag, Minus, Play, Plus, SkipForward, Timer, Undo2 } from 'lucide-react';
 import type { Db, ISODate, IssueFlag, PerformedSet, PlannedSet, Side } from '../../domain/types';
 import { addDays, fmtDateKo, weekdayOf } from '../../engine/dates';
 import { plateBreakdown } from '../../engine/rounding';
@@ -16,7 +16,7 @@ import {
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
 import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
-import { Badge, Btn, cx, Empty, fmtKg, PlateChips, RpeChips, RpePicker, Sheet, Stepper } from '../components';
+import { Badge, Btn, Chip, cx, Empty, fmtKg, PlateChips, RpeChips, RpePicker, Sheet, Stepper } from '../components';
 
 const FLAG_KO: Record<IssueFlag, string> = {
   equipment_failure: '장비 문제', grip_slip: '그립 미끄러짐', j_cup_collision: 'J컵 충돌', unusual_shoes: '평소와 다른 신발',
@@ -113,7 +113,7 @@ const RecordSheet = ({ t, onClose }: { t: EditTarget; onClose: () => void }) => 
         <Stepper label={t.group.exercise.loadMode === 'bodyweight_plus' ? '추가 중량' : '중량'} unit="kg" value={weight} onChange={setWeight} steps={[inc]} />
         <Stepper label={isStatic ? '유지 시간' : '반복수'} unit={isStatic ? '초' : '회'} value={reps} onChange={setReps} steps={[1]} decimal={false} />
         <RpePicker value={rpe} onChange={setRpe} />
-        <div><div className="mb-1 text-[11px] text-dust">이상 태그 — 표시한 세트는 진행 판정·계수 학습에서 제외 후보가 됩니다</div><FlagPicker flags={flags} onChange={setFlags} /></div>
+        <div><div className="mb-1 text-[11px] text-dust">이상 태그. 표시한 세트는 진행 판정과 계수 학습에서 뺄 수 있습니다</div><FlagPicker flags={flags} onChange={setFlags} /></div>
         <label className="block"><span className="mb-1 block text-[11px] text-dust">메모</span><input className="field" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} /></label>
         {p && <p className="text-xs text-dust">수정 전 값은 변경 이력에 남고, 당시 추천 중량 기록은 지워지지 않습니다.</p>}
       </div>
@@ -144,7 +144,7 @@ const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop:
     <div className={cx('mt-2 rounded-md bg-deck px-2.5 py-1.5 text-[13px] leading-snug', sug.action === 'decrease' && 'border-l-[3px] border-p25')}>
       <div className="flex items-start justify-between gap-2">
         <span>{sug.load !== null && <b className="num-d text-[15px]">추천 {fmtKg(sug.load)}kg · </b>}{sug.message}</span>
-        {sug.detail && <button type="button" className="h-6 shrink-0 text-[11px] text-dust underline" onClick={() => setWhy(!why)} aria-expanded={why}>근거</button>}
+        {sug.detail && <Chip className="!h-7 !bg-rail px-2 text-[11px]" onClick={() => setWhy(!why)} aria-expanded={why}>{why ? '접기' : '근거'}</Chip>}
       </div>
       {why && sug.detail && (
         <dl className="num mt-1.5 grid grid-cols-2 gap-x-3 border-t border-rail pt-1.5 text-[11px] text-dust">
@@ -157,6 +157,12 @@ const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop:
     </div>
   );
 };
+
+const UndoSkip = ({ label, onClick }: { label: string; onClick: () => void }) => (
+  <button type="button" className="press flex h-[40px] flex-col items-center justify-center rounded-md bg-deck text-[10px] leading-none text-dust" aria-label={`${label} 되돌리기`} onClick={(e) => { e.stopPropagation(); onClick(); }}>
+    <Undo2 size={14} aria-hidden /><span className="mt-0.5">{label}</span>
+  </button>
+);
 
 const PendingCheck = () => <span className="flex h-[40px] items-center justify-center rounded-md border border-rail text-knurl" aria-label="대기"><Check size={16} /></span>;
 
@@ -269,17 +275,17 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
               )}
               {s.status === 'done' ? <CheckCell done fresh={justDone.has(s.id)} label={label(s)} />
                 : s.status === 'planned' ? <PendingCheck />
-                : <button type="button" className="h-[40px] text-[11px] leading-tight text-dust underline" onClick={(e) => { e.stopPropagation(); void run((d) => unskipSet(d, s.id)); }}>{s.status === 'skipped_by_autoregulation' ? '조기종료' : '건너뜀'}<br />되돌리기</button>}
+                : <UndoSkip label={s.status === 'skipped_by_autoregulation' ? '조기종료' : '건너뜀'} onClick={() => void run((d) => unskipSet(d, s.id))} />}
             </li>
           );
         })}
       </ul>
       {focused && active && (
-        <div className="flex justify-end">
-          <button type="button" className="h-8 text-[12px] text-dust underline" disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}>이 세트 건너뛰기</button>
+        <div className="mt-1 flex justify-end">
+          <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}><SkipForward size={14} aria-hidden />이 세트 건너뛰기</Chip>
         </div>
       )}
-      {g.extras.length > 0 && <div className="num mt-1 text-xs text-dust">계획 외: {g.extras.map((p) => <button key={p.id} type="button" className="mr-2 h-8 underline" onClick={() => onEdit({ perf: p, group: g, date })}>{short(p)}</button>)}</div>}
+      {g.extras.length > 0 && <div className="num mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-dust"><span>계획 외 세트</span>{g.extras.map((p) => <Chip key={p.id} onClick={() => onEdit({ perf: p, group: g, date })}>{short(p)}</Chip>)}</div>}
     </div>
   );
 };
@@ -340,7 +346,7 @@ const ArmTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
                 <div className="mt-1.5"><RpeChips value={rpe} onChange={setRpe} disabled={disabled} /></div>
                 <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-dust">
                   <span>{separate ? '한쪽만 넣으면 그 팔만, 둘 다 비우면 중량 없이 기록' : '값은 다음 세트로 이어집니다'}</span>
-                  <button type="button" className="h-8 shrink-0 underline" disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, open.map((x) => x.id), false, '사용자 스킵', ctx))}>남은 {open.length}세트 건너뛰기</button>
+                  <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, open.map((x) => x.id), false, '사용자 스킵', ctx))}><SkipForward size={14} aria-hidden />남은 {open.length}세트 건너뛰기</Chip>
                 </div>
               </li>
             );
@@ -370,7 +376,7 @@ const ArmTable = ({ db, g, date, focused, disabled, onEdit, onFocus }: {
               )}
               {s.status === 'done' ? <CheckCell done fresh={justDone.has(s.id)} label={`세트 ${i + 1}`} />
                 : s.status === 'planned' ? <PendingCheck />
-                : <button type="button" className="h-[40px] text-[11px] leading-tight text-dust underline" onClick={(e) => { e.stopPropagation(); void run((d) => unskipSet(d, s.id)); }}>건너뜀<br />되돌리기</button>}
+                : <UndoSkip label="건너뜀" onClick={() => void run((d) => unskipSet(d, s.id))} />}
             </li>
           );
         })}
@@ -389,7 +395,7 @@ const ArmFill = ({ g }: { g: DayGroupView }) => {
   const [rpe, setRpe] = useState<number | null>(g.instance.arm?.rpe ?? null);
   return (
     <div className="mt-2 rounded-lg border border-p25/50 p-2.5">
-      <div className="text-sm font-bold text-p25">원본 누락 — 직접 입력 필요</div>
+      <div className="text-sm font-bold text-p25">원본에 값이 없습니다. 직접 입력하세요</div>
       <p className="mt-0.5 text-xs text-dust">PDF {g.instance.arm?.sourcePage}쪽에 세트·반복수가 없습니다. 자동으로 추정하지 않으니 수행할 값을 정해 주세요.</p>
       <div className="mt-2 grid grid-cols-3 gap-2">
         <label className="text-[11px] text-dust">세트<input className="field num-d mt-0.5 text-center" type="number" inputMode="numeric" value={sets} onChange={(e) => setSets(e.target.value)} /></label>
@@ -427,7 +433,7 @@ const CardMenu = ({ db, g, date, disabled, isFirst, isLast, onEdit, onClose }: {
         <div className="mt-3 space-y-1 text-sm">
           <div className="text-xs text-dust">PDF {arm.sourcePage}쪽 원문</div>
           <div>{arm.sourceText || '—'}</div>
-          {video && <a className="inline-flex h-10 items-center text-p20 underline" href={video.url} target="_blank" rel="noopener noreferrer">운동 영상 열기</a>}
+          {video && <a className="press mt-1 inline-flex h-10 items-center gap-1.5 rounded-lg bg-deck px-3 text-sm font-semibold" href={video.url} target="_blank" rel="noopener noreferrer"><Play size={15} aria-hidden />운동 영상</a>}
         </div>
       )}
     </Sheet>
@@ -467,7 +473,7 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
           {arm?.rom && <Badge tone="info">{arm.rom}</Badge>}
           {arm?.execution.map((e) => <Badge key={e} tone="info">{e}</Badge>)}
           {arm?.loadNote && <Badge tone="info">{arm.loadNote}</Badge>}
-          {arm && arm.sourceMissing.includes('intensity') && <Badge tone="bad">RPE 원본 누락 — 직접 결정</Badge>}
+          {arm && arm.sourceMissing.includes('intensity') && <Badge tone="bad">원본에 RPE 없음</Badge>}
           {arm?.userFilled && <Badge tone="warn">직접 입력값</Badge>}
         </div>
       )}
@@ -518,7 +524,7 @@ const ReportSheet = ({ report, onClose }: { report: SessionReport; onClose: () =
     {report.learned.length > 0 && <h3 className="mt-4 mb-1 text-sm font-bold">계수 학습 관측</h3>}
     <ul className="space-y-1">
       {report.learned.map((l, i) => (
-        <li key={i} className="num flex justify-between gap-2 text-sm"><span>{l.exerciseName}{l.used ? '' : <span className="text-dust"> — 제외 후보({l.reason})</span>}</span><span className="num-d text-[16px]">k {l.k.toFixed(3)}</span></li>
+        <li key={i} className="num flex justify-between gap-2 text-sm"><span>{l.exerciseName}{l.used ? '' : <span className="text-dust"> 제외 후보({l.reason})</span>}</span><span className="num-d text-[16px]">k {l.k.toFixed(3)}</span></li>
       ))}
     </ul>
   </Sheet>
@@ -604,7 +610,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, -1))} aria-label="전날"><ChevronLeft size={22} /></button>
         <div className="min-w-0 flex-1 text-center">
           <h1 className="text-[17px] leading-tight font-extrabold">{fmtDateKo(date)}{date === today ? ' 오늘' : ''}</h1>
-          <div className="num text-[11px] text-dust">{total ? `계획 ${done}/${total}세트` : '계획 없음'}{date !== today && <> · <button type="button" className="text-p20 underline" onClick={() => onDate(today)}>오늘로</button></>}</div>
+          <div className="num flex items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `계획 ${done}/${total}세트` : '계획 없음'}</span>{date !== today && <Chip className="!h-6 px-2 text-[11px]" onClick={() => onDate(today)}>오늘</Chip>}</div>
         </div>
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, 1))} aria-label="다음 날"><ChevronRight size={22} /></button>
       </header>
@@ -619,7 +625,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
         <div className="mt-1.5 rounded-xl bg-steel px-3 text-[13px]">
           <div className="flex min-h-[46px] items-center justify-between gap-2">
             <span className="num min-w-0 truncate">
-              {here ? <><span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-p10 align-middle" aria-hidden />세션 진행 중 <span className="text-dust">· {new Date(here.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: db.settings.timezone })} 시작</span></> : <span className="text-dust">첫 세트를 기록하면 세션이 시작됩니다</span>}
+              {here ? <><span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-p10 align-middle" aria-hidden />세션 진행 중 <span className="text-dust">· {new Date(here.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: db.settings.timezone })} 시작</span></> : session ? <span className="text-dust">이 날짜의 체중</span> : <span className="text-dust">첫 세트를 기록하면 세션이 시작됩니다</span>}
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
               {needsBw && <button type="button" className={cx('press num h-9 rounded-md px-2', curBw ? 'bg-deck' : 'border border-p25 text-p25')} aria-expanded={bwOpen} onClick={() => setBwOpen(!bwOpen)}>체중 <span className="num-d text-[15px]">{curBw ? `${curBw}` : '입력'}</span></button>}
@@ -636,8 +642,8 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       )}
 
       {offerArm && armNext && (
-        <Btn className="mt-1.5 w-full" disabled={readOnly} onClick={async () => { const r = await run((d, ctx) => assignArmDay(d, armNext.dayIndex, date, ctx)); if (r.ok) toast(`ARM ${armNext.block} W${armNext.week} D${armNext.day}를 배정했습니다`); }}>
-          ARM 추가 — {armNext.block} W{armNext.week} D{armNext.day}
+        <Btn className="mt-1.5 w-full" disabled={readOnly} onClick={async () => { const r = await run((d, ctx) => assignArmDay(d, armNext.dayIndex, date, ctx)); if (r.ok) toast(`ARM ${armNext.block} W${armNext.week} D${armNext.day} 배정`); }}>
+          <Plus size={16} aria-hidden />ARM {armNext.block} W{armNext.week} D{armNext.day} 추가
         </Btn>
       )}
       {groups.length === 0 && (

@@ -21,6 +21,15 @@ export const Btn = ({ kind = 'ghost', className, ...p }: React.ButtonHTMLAttribu
   />
 );
 
+/** 보조 동작용 작은 버튼. 밑줄 텍스트 링크 대신 쓴다 */
+export const Chip = ({ className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  <button
+    type="button"
+    {...p}
+    className={cx('press inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-md bg-deck px-2.5 text-[12px] font-semibold text-chalk/85 select-none disabled:opacity-40', className)}
+  />
+);
+
 /** 상태 표시: 색만으로 구분하지 않도록 항상 글자를 함께 쓴다 */
 export const Badge = ({ tone = 'mute', children }: { tone?: 'mute' | 'ok' | 'warn' | 'bad' | 'info'; children: ReactNode }) => (
   <span className={cx(
@@ -194,11 +203,10 @@ export const RpeChips = ({ value, onChange, cap, disabled, label = '실제 RPE' 
 const PLATE_COLOR: Record<string, string> = { 25: '#d8402f', 20: '#3f7fe0', 15: '#f2c230', 10: '#3fa568', 5: '#e8e6df', 2.5: '#30343b', 1.25: '#9aa0aa' };
 /** 한쪽 원판 구성. 색은 경기용 원판 색, 숫자를 함께 표기 */
 export const PlateChips = ({ perSide, remainder }: { perSide: number[]; remainder: number }) => (
-  <div className="flex flex-wrap items-center gap-1 text-xs text-dust" aria-label={`한쪽 원판: ${perSide.join(', ') || '없음'}`}>
-    <span>한쪽</span>
+  <div className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-dust" aria-label={`한쪽 원판 ${perSide.join(', ') || '없음'}`}>
     {perSide.length === 0 && <span>빈 바</span>}
     {perSide.map((p, i) => (
-      <span key={i} className="num rounded px-1.5 py-0.5 font-bold" style={{ background: PLATE_COLOR[String(p)] ?? '#6b7280', color: [5, 15].includes(p) ? '#1b1608' : '#fff', border: '1px solid rgba(255,255,255,.18)' }}>{p}</span>
+      <span key={i} className="num rounded px-1 py-0.5 text-[11px] font-bold" style={{ background: PLATE_COLOR[String(p)] ?? '#6b7280', color: [5, 15].includes(p) ? '#1b1608' : '#fff', border: '1px solid rgba(255,255,255,.18)' }}>{p}</span>
     ))}
     {remainder > 0 && <span className="text-p25">보유 원판으로 {remainder}kg 부족</span>}
   </div>

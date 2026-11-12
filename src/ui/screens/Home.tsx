@@ -1,4 +1,5 @@
 // 홈: 주·월 달성률 게이지, 오늘 운동, ARM 현황, 백업 알림
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ISODate } from '../../domain/types';
 import { addDays, addMonths, fmtDateKo, monthEnd, monthStart, weekStart, datesBetween } from '../../engine/dates';
@@ -7,7 +8,7 @@ import { activeSession } from '../../application/session';
 import { armDayList } from '../../application/arm';
 import { fatigueReport } from '../../application/analysis';
 import { ensureWeeksFor, todayStr, useApp } from '../store';
-import { Badge, Btn, cx, PlateGauge, Row, SectionTitle, Sheet } from '../components';
+import { Badge, Btn, Chip, cx, PlateGauge, Row, SectionTitle, Sheet } from '../components';
 
 export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }) => {
   const { db } = useApp();
@@ -77,9 +78,9 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
           ))}
         </div>
         <div className="flex items-center">
-          <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간">‹</Btn>
+          <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간"><ChevronLeft size={20} /></Btn>
           <button type="button" className="num tap text-xs whitespace-nowrap" onClick={() => setAnchor(today)}>{label}{isCurrent ? '' : ' · 지금으로'}</button>
-          <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간">›</Btn>
+          <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간"><ChevronRight size={20} /></Btn>
         </div>
       </div>
 
@@ -104,7 +105,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         {a.pb.addedSets > 0 && <Badge>추가 {a.pb.addedSets}세트</Badge>}
         {a.pb.extraSets > 0 && <Badge>계획 외 {a.pb.extraSets}세트</Badge>}
       </div>
-      <details className="mt-1"><summary className="flex h-8 cursor-pointer items-center text-[11px] text-dust">지표 설명</summary><p className="text-xs text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p></details>
+      <details className="mt-1"><summary className="press inline-flex h-8 cursor-pointer list-none items-center rounded-md bg-deck px-2.5 text-[12px] font-semibold text-chalk/85 [&::-webkit-details-marker]:hidden">지표 설명</summary><p className="text-xs text-dust">원본 계획 달성률은 기간 전체(아직 오지 않은 날 포함)가 분모입니다. 기한 경과분 이행률은 오늘까지 예정된 세트만 봅니다. 크레딧은 옮겨서 수행해도 원래 계획일의 기간에 들어갑니다.</p></details>
 
       {fatigueReport(db).length > 0 && (
         <button type="button" className="press mt-2 w-full rounded-xl border-l-[3px] border-p15 bg-steel p-2.5 text-left text-[13px]" onClick={() => go('analysis')}>
@@ -113,15 +114,15 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
         </button>
       )}
 
-      <SectionTitle>ARM SYSTEM</SectionTitle>
+      <SectionTitle>ARM</SectionTitle>
       <div className="rounded-xl bg-steel px-3 py-0.5">
         {!db.arm ? (
-          <Row label="데이터 없음"><button type="button" className="tap text-p20 underline" onClick={() => go('arm')}>ARM JSON 가져오기</button></Row>
+          <Row label="데이터 없음"><Chip onClick={() => go('arm')}>JSON 가져오기</Chip></Row>
         ) : (
           <>
             <Row label="다음 배정할 Day">{nextArm ? `${nextArm.block} W${nextArm.week} D${nextArm.day}` : '전체 완료'}</Row>
             <Row label={`${label} ARM 세트`}>{a.arm.original.total ? `${a.arm.original.done}/${a.arm.original.total}세트 (${a.arm.original.pct}%)` : '배정 없음'}</Row>
-            <Row label="운영 방식">주 {db.settings.armMode}일 · <button type="button" className="tap text-p20 underline" onClick={() => go('arm')}>배정·처방 보기</button></Row>
+            <Row label="운영 방식"><span className="flex items-center justify-end gap-2">주 {db.settings.armMode}일<Chip onClick={() => go('arm')}>배정 보기</Chip></span></Row>
           </>
         )}
       </div>

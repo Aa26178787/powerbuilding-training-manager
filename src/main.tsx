@@ -13,5 +13,16 @@ createRoot(document.getElementById('root') as HTMLElement).render(<StrictMode><A
 
 // 앱 셸 오프라인 사용을 위한 Service Worker(배포 빌드에서만). 훈련 데이터는 IndexedDB에만 저장한다.
 if (import.meta.env.PROD && !import.meta.env.VITE_PREVIEW && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => undefined); });
+  // 이미 이전 버전이 화면을 관리하고 있었다면, 새 버전이 넘겨받는 순간 '업데이트 준비됨'을 알린다
+  let hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; }
+    window.dispatchEvent(new Event('ptm-update-ready'));
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      // 앱을 다시 볼 때마다 새 버전이 있는지 확인(설치된 앱은 오래 켜 두는 경우가 많음)
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => undefined); });
+    }).catch(() => undefined);
+  });
 }

@@ -1,4 +1,5 @@
 // 분석: 근육군별 가중 세트, 운동별 추세, 주간 달성률 추이, 피로 신호
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import type { Exercise, ISODate } from '../../domain/types';
 import { MUSCLES, musclesOf } from '../../domain/defaults';
@@ -70,9 +71,9 @@ export const AnalysisScreen = () => {
 
       <SectionTitle right={
         <div className="flex items-center">
-          <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간">‹</Btn>
+          <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간"><ChevronLeft size={20} /></Btn>
           <button type="button" className="num tap text-xs whitespace-nowrap" onClick={() => { setAnchor(today); setMode(mode === 'week' ? 'month' : 'week'); }}>{label} · {mode === 'week' ? '월간으로' : '주간으로'}</button>
-          <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간">›</Btn>
+          <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간"><ChevronRight size={20} /></Btn>
         </div>}>근육군별 세트</SectionTitle>
       <div className="rounded-xl bg-steel p-3">
         {vol.length === 0 ? <p className="text-sm text-dust">이 기간에 완료한 세트가 없습니다.</p>

@@ -37,10 +37,10 @@ export const Onboarding = () => {
 
       <h2 className="mt-8 text-base font-bold">선택 입력</h2>
       <p className="text-sm text-dust">비워 두어도 됩니다. 기록이 없는 운동은 첫 세션에서 워밍업 후 직접 중량을 정합니다.</p>
-      <label className="mt-3 block text-xs text-dust">현재 체중 (kg) — 딥스·풀업 계산에 사용
+      <label className="mt-3 block text-xs text-dust">현재 체중(kg). 딥스와 풀업 중량 계산에 씁니다
         <input className="field num mt-1" type="number" inputMode="decimal" placeholder="예: 66.0" value={bw} onChange={(e) => setBw(e.target.value)} />
       </label>
-      <div className="mt-3 text-xs text-dust">최근 기록 (중량·반복·RPE) — 입력 칸을 벗어나면 저장됩니다</div>
+      <div className="mt-3 text-xs text-dust">최근 기록(중량, 반복, RPE). 칸을 벗어나면 저장됩니다</div>
       <div className="divide-y divide-rail rounded-xl bg-steel px-3">
         {SEED_EXERCISES.map((id) => <SeedEditor key={id} db={db} exerciseId={id} compact />)}
       </div>

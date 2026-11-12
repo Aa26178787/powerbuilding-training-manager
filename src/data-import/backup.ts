@@ -31,7 +31,7 @@ export const buildBackup = (db: Db, includeArm: boolean, now: string): BackupFil
   }
   return {
     app: BACKUP_APP_ID, backupSchema: BACKUP_SCHEMA, exportedAt: now, includesArm: includeArm,
-    notice: includeArm ? 'ARM SYSTEM 저작권 자료 포함 — 공개 저장소·공유 금지' : 'ARM 원문·처방 라이브러리 제외(수행 기록만 포함)',
+    notice: includeArm ? 'ARM 저작권 자료가 들어 있습니다. 공개 저장소에 올리거나 공유하지 마세요' : 'ARM 원문·처방 라이브러리 제외(수행 기록만 포함)',
     data,
   };
 };

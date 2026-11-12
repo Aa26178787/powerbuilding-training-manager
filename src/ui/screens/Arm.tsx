@@ -14,7 +14,7 @@ const volText = (p: ArmPrescription) => (p.sets === null || (p.reps === null && 
 const intText = (p: ArmPrescription) => [p.percent_1rm !== null ? `${p.percent_1rm}%` : '', p.rpe_range ? `RPE ${p.rpe_range[0]}~${p.rpe_range[1]}` : p.rpe !== null ? `RPE ${p.rpe}` : ''].filter(Boolean).join(' ') || 'RPE 누락';
 const GUIDE_KO: Record<string, string> = {
   load_methods: '강도 표기 방식', order: '블록 순서', joint_pain_adjustment: '인대·관절 통증 시', high_workload_option: '작업량이 과할 때',
-  'rest_between_sets.RPE_9_to_10': '세트 간 휴식 — RPE 9~10', 'rest_between_sets.RPE_6_to_8': '세트 간 휴식 — RPE 6~8', 'rest_between_sets.basic_compounds': '세트 간 휴식 — 기본 복합 운동', warmup: '워밍업',
+  'rest_between_sets.RPE_9_to_10': '세트 간 휴식 (RPE 9~10)', 'rest_between_sets.RPE_6_to_8': '세트 간 휴식 (RPE 6~8)', 'rest_between_sets.basic_compounds': '세트 간 휴식 (복합 운동)', warmup: '워밍업',
 };
 const VERIFY_KO: Record<string, string> = { verified_visual: '원본 확인', dual_ocr_match: 'OCR 2회 일치', ocr_resolved: 'OCR 교차 판독', source_missing: '원본 누락', manually_checked: '원본 확인', ocr_parsed_unverified: 'OCR 미검증', needs_review: '검토 필요' };
 
@@ -90,7 +90,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
   if (!db.arm) {
     return (
       <div>
-        <header><h1 className="text-lg font-extrabold">ARM SYSTEM</h1></header>
+        <header><h1 className="text-lg font-extrabold">ARM</h1></header>
         <div className="mt-3"><Importer hasData={false} /></div>
       </div>
     );
@@ -121,7 +121,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
     if (!next) return;
     ensureWeeksFor([target]);
     const r = await run((d, ctx) => assignArmDay(d, next.dayIndex, target, ctx));
-    if (r.ok) { toast(`${next.block} W${next.week} D${next.day} → ${fmtDateKo(target)} 배정`); setDate(''); setAck(false); }
+    if (r.ok) { toast(`${fmtDateKo(target)}에 ${next.block} W${next.week} D${next.day} 배정`); setDate(''); setAck(false); }
   };
   const weekPlan = suggestArmDates(db, today);
   const assignWeek = async () => {
@@ -134,7 +134,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
 
   return (
     <div>
-      <header><h1 className="text-lg font-extrabold">ARM SYSTEM</h1><p className="num text-sm text-dust">{arm.blockOrder.join(' → ')} · 전체 {days.length}일 중 {db.settings.armCursor}일 배정</p></header>
+      <header><h1 className="text-lg font-extrabold">ARM</h1><p className="num text-sm text-dust">{arm.blockOrder.join(' → ')} · 전체 {days.length}일 중 {db.settings.armCursor}일 배정</p></header>
 
       <SectionTitle>다음 Day 배정</SectionTitle>
       <div className="rounded-xl bg-steel p-3">
@@ -162,7 +162,7 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
               </label>
             )}
             <Btn kind="primary" className="mt-3 w-full" disabled={crossesWeek && !ack} onClick={assign}>{fmtDateKo(target)}에 배정</Btn>
-            <Btn kind="quiet" className="mt-1 w-full" onClick={async () => { if (await ask(`${next.block} W${next.week} D${next.day}를 배정하지 않고 건너뜁니다.`, '건너뛰기')) void run(() => ({ settings: { armCursor: db.settings.armCursor + 1 } })); }}>이 Day 건너뛰기</Btn>
+            <Btn kind="quiet" className="mt-1 w-full" onClick={async () => { if (await ask(`${next.block} W${next.week} D${next.day}는 배정하지 않고 건너뜁니다.`, '건너뛰기')) void run(() => ({ settings: { armCursor: db.settings.armCursor + 1 } })); }}>이 Day 건너뛰기</Btn>
           </>
         ) : <p className="text-sm">모든 ARM Day를 배정했습니다.</p>}
         {db.settings.armCursor > 0 && !db.workouts[`arm:${db.settings.armCursor - 1}`] && (
@@ -224,10 +224,10 @@ export const ArmScreen = ({ go }: { go: (tab: string, date?: ISODate) => void })
                     <div className="mt-1 flex flex-wrap gap-1">
                       {p.rom && <Badge tone="info">{p.rom}</Badge>}
                       {p.execution.map((e) => <Badge key={e} tone="info">{e}</Badge>)}
-                      {excluded && <Badge>통합 프로그램과 중복 — 제외</Badge>}
-                      {p.source_missing.length > 0 && !excluded && <Badge tone="bad">원본 누락 — 직접 입력 필요</Badge>}
+                      {excluded && <Badge>본 프로그램과 겹쳐 제외</Badge>}
+                      {p.source_missing.length > 0 && !excluded && <Badge tone="bad">원본 누락, 직접 입력 필요</Badge>}
                       {db.armOverrides[p.id] && <Badge tone="warn">교정됨</Badge>}
-                      <Badge>{VERIFY_KO[p.verification_status] ?? p.verification_status}</Badge>
+                      {p.verification_status !== 'verified_visual' && p.verification_status !== 'dual_ocr_match' && p.verification_status !== 'manually_checked' && p.verification_status !== 'source_missing' && <Badge>{VERIFY_KO[p.verification_status] ?? p.verification_status}</Badge>}
                     </div>
                     <div className="mt-1 text-xs text-dust">원문: {p.prescription_source}</div>
                   </button>

@@ -1,4 +1,5 @@
 // 캘린더: 주간·월간 보기, 운동일 이동·맞교환·병합·분할·면제, 변경 이력과 취소
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeReason, Db, ISODate } from '../../domain/types';
 import { addDays, addMonths, datesBetween, fmtDateKo, monthEnd, monthStart, weekDates, weekStart, weekdayOf, WEEKDAY_KO } from '../../engine/dates';
@@ -49,7 +50,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
   const confirm = async () => {
     if (!preview) return;
     const r = await run((d, ctx) => commitChange(d, previewChange(d, action === 'move' ? { kind: 'move', setIds, toDate } : action === 'swap' ? { kind: 'swap', dateA: date, dateB: toDate } : { kind: 'status', setIds, status: action === 'excuse' ? 'excused' : 'removed', statusReason: REASONS.find((x) => x[0] === reason)?.[1] }), { reason, note, acknowledgedWarnings: ack }, ctx));
-    if (r.ok) { toast(`${preview.summary} — 확정했습니다`); onClose(); }
+    if (r.ok) { toast(`${preview.summary} 확정`); onClose(); }
   };
   const quick = [...weekDates(weekStart(date)), ...weekDates(addDays(weekStart(date), 7))].filter((d) => d !== date);
   return (
@@ -69,7 +70,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
           </fieldset>
           {action !== 'swap' && (
             <fieldset>
-              <legend className="mb-1 text-xs font-bold text-dust">대상 운동 — 일부만 고르면 세션이 분할됩니다</legend>
+              <legend className="mb-1 text-xs font-bold text-dust">대상 운동. 일부만 고르면 세션이 나뉩니다</legend>
               <div className="divide-y divide-rail overflow-hidden rounded-lg bg-deck">
                 {groups.map((g) => (
                   <label key={g.instance.id} className="flex min-h-[44px] cursor-pointer items-center gap-3 px-3 text-sm">
@@ -100,7 +101,7 @@ const ChangeFlow = ({ db, date, onClose }: { db: Db; date: ISODate; onClose: () 
           {preview && !preview.ok && <div className="rounded-lg bg-p25/15 p-3 text-sm">{preview.errors.join(' / ')}</div>}
           {preview?.ok && (
             <div className="rounded-xl bg-deck p-3">
-              <div className="text-sm font-bold">미리보기 — {preview.summary}</div>
+              <div className="text-sm font-bold">미리보기: {preview.summary}</div>
               <div className="num mt-1 text-xs text-dust">이동 {preview.counts.moved} · 면제 {preview.counts.excused} · 삭제 {preview.counts.removed}세트. 원본 계획과 달성률 분모는 그대로 보존됩니다{preview.counts.excused + preview.counts.removed > 0 ? '(조정 계획 이행률의 분모만 줄어듭니다)' : ''}.</div>
               {preview.affected.map((a) => (
                 <div key={a.date} className="mt-3 border-t border-rail pt-2">
@@ -171,11 +172,11 @@ export const CalendarScreen = ({ go }: { go: (tab: string, date?: ISODate) => vo
         </div>
       </header>
       <div className="mt-2 flex items-center justify-between">
-        <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전">‹</Btn>
+        <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전"><ChevronLeft size={20} /></Btn>
         <button type="button" className="num tap text-sm font-semibold" onClick={() => setAnchor(today)}>
           {mode === 'week' ? `${fmtDateKo(range.start)} ~ ${fmtDateKo(range.end)}` : `${anchor.slice(0, 4)}년 ${Number(anchor.slice(5, 7))}월`}
         </button>
-        <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음">›</Btn>
+        <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음"><ChevronRight size={20} /></Btn>
       </div>
 
       {mode === 'week' ? (

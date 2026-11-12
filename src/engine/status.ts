@@ -7,7 +7,7 @@ export type WorkoutStatus =
 
 export const STATUS_LABEL: Record<WorkoutStatus, string> = {
   planned: '예정', in_progress: '진행 중', completed: '완료', partial: '일부 수행', missed: '미수행',
-  rescheduled: '이동됨', merged: '병합됨', excused: '면제', cancelled: '취소', overdue: '기한 경과·미확정',
+  rescheduled: '이동됨', merged: '병합됨', excused: '면제', cancelled: '취소', overdue: '지난 계획',
 };
 
 /**

@@ -78,17 +78,17 @@ export const adviseNextSet = (i: NextSetInput): NextSetAdvice => {
     const over = i.lastRpe > i.rpeCap;
     return {
       action: 'decrease', load, predictedRpe: predicted, offerStop: over,
-      reason: over ? `직전 세트 @${i.lastRpe}로 상한 @${i.rpeCap} 초과 — 감량 또는 종료 검토`
-        : `같은 중량이면 다음 세트 약 @${predicted} 예상(상한 @${i.rpeCap}) — 감량 추천`,
+      reason: over ? `직전 세트가 @${i.lastRpe}로 상한 @${i.rpeCap}을 넘었습니다. 감량하거나 종료하세요`
+        : `같은 중량이면 다음 세트는 약 @${predicted}입니다(상한 @${i.rpeCap}). 감량을 권합니다`,
     };
   }
   if (i.isFirstBackoff && i.lastRpe <= i.targetRpe - 1) {
     const load = retarget(i.targetRpe);
     if (load > i.load) {
-      return { action: 'increase', load, predictedRpe: predicted, offerStop: false, reason: `첫 Backoff @${i.lastRpe}로 목표 @${i.targetRpe}보다 가벼움 — 증량 가능` };
+      return { action: 'increase', load, predictedRpe: predicted, offerStop: false, reason: `첫 Backoff가 @${i.lastRpe}로 목표 @${i.targetRpe}보다 가볍습니다. 올려도 됩니다` };
     }
   }
-  return { action: 'keep', load: i.load, predictedRpe: predicted, offerStop: false, reason: `직전 세트 @${i.lastRpe} — 중량 유지` };
+  return { action: 'keep', load: i.load, predictedRpe: predicted, offerStop: false, reason: `직전 세트 @${i.lastRpe}. 같은 중량으로 갑니다` };
 };
 
 /** Variation 첫 수행 시작 중량: Comp e1RM × k_base × k_personal에서 목표 반복·RPE로 환산 (SRS FR-032) */
