@@ -17,7 +17,7 @@ import {
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
 import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
-import { Badge, Btn, Chip, cx, Empty, fmtKg, PLATE_COLOR, RpePicker, Sheet, Stepper } from '../components';
+import { Badge, Btn, Chip, cx, fmtKg, PLATE_COLOR, RpePicker, Sheet, Stepper } from '../components';
 
 const FLAG_KO: Record<IssueFlag, string> = {
   equipment_failure: '장비 문제', grip_slip: '그립 미끄러짐', j_cup_collision: 'J컵 충돌', unusual_shoes: '평소와 다른 신발',
@@ -593,7 +593,7 @@ const RestTimer = ({ since, target, onClose }: { since: string; target: number; 
   );
 };
 
-export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate) => void }) => {
+export const DayScreen = ({ date, onDate, onCalendar }: { date: ISODate; onDate: (d: ISODate) => void; onCalendar?: () => void }) => {
   const { db, readOnly } = useApp();
   const [edit, setEdit] = useState<EditTarget | null>(null);
   const [report, setReport] = useState<SessionReport | null>(null);
@@ -601,7 +601,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
   const [openId, setOpenId] = useState<string | null>(null);
   const [timerOff, setTimerOff] = useState<string | null>(null);
   const [bwOpen, setBwOpen] = useState(false);
-  useEffect(() => { ensureWeeksFor([date]); }, [date, db?.settings.programStart]);
+  useEffect(() => { ensureWeeksFor([date, addDays(date, 7), addDays(date, 14)]); }, [date, db?.settings.programStart]);
   if (!db) return null;
   const today = todayStr();
   const groups = dayView(db, date);
@@ -639,7 +639,7 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
       <header className="flex items-center gap-1">
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, -1))} aria-label="전날"><ChevronLeft size={22} /></button>
         <div className="min-w-0 flex-1 text-center">
-          <div className="flex items-center justify-center gap-2"><h1 className="text-[16px] leading-5 font-bold">{fmtDateKo(date)}</h1>{date !== today && <button type="button" className="press relative inline-flex h-5 items-center rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</div>
+          <div className="flex justify-center"><span className="relative"><h1 className="text-[16px] leading-5 font-bold">{fmtDateKo(date)}</h1>{date !== today && <button type="button" className="press absolute top-1/2 left-full ml-2 inline-flex h-5 -translate-y-1/2 items-center whitespace-nowrap rounded-md bg-deck px-2 text-[11px] leading-none font-semibold text-chalk after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']" onClick={() => onDate(today)}>오늘</button>}</span></div>
           <div className="num flex h-5 items-center justify-center gap-2 text-[11px] text-dust"><span>{total ? `${date === today ? '오늘, ' : ''}${total}세트 중 ${done}세트` : '계획 없음'}</span></div>
         </div>
         <button type="button" className="press flex h-11 w-11 items-center justify-center rounded-lg text-dust" onClick={() => onDate(addDays(date, 1))} aria-label="다음 날"><ChevronRight size={22} /></button>
@@ -676,9 +676,38 @@ export const DayScreen = ({ date, onDate }: { date: ISODate; onDate: (d: ISODate
           <Plus size={16} aria-hidden />ARM {armNext.block} W{armNext.week} D{armNext.day} 추가
         </Btn>
       )}
-      {groups.length === 0 && (
-        <div className="mt-4"><Empty>{db.settings.programStart && date < db.settings.programStart ? `프로그램 시작일(${fmtDateKo(db.settings.programStart)}) 이전입니다.` : '이 날짜에 예정된 운동이 없습니다. 캘린더에서 다른 날의 운동을 옮겨 올 수 있습니다.'}</Empty></div>
-      )}
+      {groups.length === 0 && (() => {
+        const before = !!db.settings.programStart && date < db.settings.programStart;
+        // 다음 운동이 있는 날(2주 안)을 찾아 미리 보여 준다
+        let next: { d: ISODate; gs: DayGroupView[] } | null = null;
+        for (let i = 1; i <= 14 && !next; i++) { const d = addDays(date, i); const gs = dayView(db, d); if (gs.length) next = { d, gs }; }
+        return (
+          <section className="pt-4">
+            <h2 className="text-[20px] leading-tight font-bold">{before ? '프로그램 시작 전' : '휴식일'}</h2>
+            <p className="mt-1 text-[13px] leading-[1.5] text-dust">{before ? `프로그램은 ${fmtDateKo(db.settings.programStart as string)}에 시작합니다.` : '이 날짜에는 계획된 운동이 없습니다.'}</p>
+            {next && (
+              <div className="mt-5 border-t border-rail pt-4">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[15px] font-bold">다음 운동 {fmtDateKo(next.d)}</span>
+                  <Chip onClick={() => onDate(next.d)}>열기</Chip>
+                </div>
+                <ul className="mt-2 text-[14px] leading-[30px]">
+                  {next.gs.filter((g) => g.instance.track === 'pb').map((g) => (
+                    <li key={g.instance.id} className="flex items-baseline justify-between gap-3"><span className="min-w-0 truncate">{g.instance.exerciseName}</span><span className="num-d shrink-0 text-[16px] text-dust">{prescriptionText(g)}</span></li>
+                  ))}
+                  {next.gs.some((g) => g.instance.track === 'arm') && <li className="text-dust">ARM {next.gs.filter((g) => g.instance.track === 'arm').length}종목</li>}
+                </ul>
+              </div>
+            )}
+            {!before && onCalendar && (
+              <div className="mt-5 flex items-center gap-3 border-t border-rail pt-4">
+                <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-dust">다른 날 운동을 오늘로 옮기려면 캘린더에서 고릅니다.</p>
+                <button type="button" className="press h-10 shrink-0 rounded-[10px] border border-rail px-3.5 text-[13px] font-semibold" onClick={onCalendar}>캘린더</button>
+              </div>
+            )}
+          </section>
+        );
+      })()}
       <div className={cx(groups.length > 0 && 'mt-1')}>
         {groups.map((g, i) => (
           <m.div key={g.instance.id} layout="position" transition={LAYOUT}>

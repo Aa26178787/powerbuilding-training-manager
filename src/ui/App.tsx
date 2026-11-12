@@ -119,7 +119,7 @@ export const App = () => {
       {readOnly && <div className="mx-4 mt-1 rounded-lg border border-p15/60 px-3 py-2 text-sm">다른 탭에서 이 앱을 쓰는 중이라 이 탭은 읽기 전용입니다. 그 탭을 닫으면 여기서 기록할 수 있습니다.</div>}
       <main className="flex-1 px-3 pt-1 pb-24">
         {tab === 'home' && <HomeScreen go={go} />}
-        {tab === 'day' && <DayScreen date={date} onDate={setDate} />}
+        {tab === 'day' && <DayScreen date={date} onDate={setDate} onCalendar={() => go('calendar')} />}
         {tab === 'calendar' && <CalendarScreen go={go} />}
         {tab === 'arm' && <ArmScreen go={go} />}
         {tab === 'program' && <ProgramScreen />}
