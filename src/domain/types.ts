@@ -1,3 +1,4 @@
+import type { Rounding } from '../engine/rounding';
 // 도메인 타입 정의 — UI/저장소와 무관한 순수 데이터 구조
 
 export type ISODate = string; // 'YYYY-MM-DD' (설정 시간대 기준 달력 날짜)
@@ -19,12 +20,23 @@ export interface Exercise {
   pattern: Pattern;
   /** 증량 및 반올림 단위(kg) */
   increment: number;
-  rounding: 'down' | 'nearest';
+  /** 예전 반올림 설정(무시). 지금은 roundingOverride와 설정의 종류별 정책을 쓴다 */
+  rounding: Rounding;
+  /** 운동별 반올림 지정. 비우면 설정의 세트 종류별 정책을 따른다 */
+  roundingOverride?: 'nearest' | 'floor' | 'ceil';
+  /** 사용 가능한 중량 단위(kg). 증량 단위(increment)와 별개. 비우면 increment */
+  loadStep?: number;
   /** bodyweight_plus: 체중 + 추가 중량(딥스·풀업). weight 필드는 추가 중량만 저장 */
   loadMode: 'external' | 'bodyweight_plus';
   barbell: boolean;
   /** Variation 시작 중량 산출 기준(Competition 종목과 기본 계수) */
   variationOf?: { compExerciseId: string; kBase: number };
+  /** 같은 동작의 다른 처방(예: 딥스 Volume ← 딥스 Strength). 자기 기록이 없을 때만 임시 추정에 쓴다 */
+  relatedOf?: { exerciseId: string; kBase: number };
+  /** 덤벨 한 손 중량, 머신 스택 표시값, 그 외 총중량 */
+  loadUnit?: 'total' | 'per_hand' | 'machine';
+  /** 외부 중량 없이 반복수로 진행(Hanging Leg Raise) */
+  bodyweightOnly?: boolean;
   /** 근육군별 세트 가중치(주동근 1.0, 보조근 0.5 근사). 없으면 기본표 사용 */
   muscles?: Record<string, number>;
   archived?: boolean;
@@ -176,6 +188,8 @@ export interface PerformedSet {
   /** 귀속 훈련일(세션 시작일 또는 사용자가 선택한 계획일) */
   sessionDate: ISODate;
   recommendationId?: string;
+  /** 밴드·어시스트 머신 보조. 외부 추가 중량과 같은 값으로 취급하지 않는다(e1RM·진행 판정 제외) */
+  assist?: 'band' | 'machine';
   deleted?: boolean;
   rev: number;
 }
@@ -192,7 +206,12 @@ export interface Session {
 
 export interface Recommendation {
   id: string;
-  kind: 'top_start' | 'backoff' | 'next_set' | 'variation_start' | 'progression';
+  kind: 'top_start' | 'backoff' | 'next_set' | 'variation_start' | 'progression' | 'related_start' | 'calibration' | 'arm_percent' | 'bodyweight_only';
+  /** 산출 방법과 신뢰도(참고 기록 있음 / 추정치 / 기록 없음) */
+  method?: string;
+  confidence?: 'record' | 'estimate' | 'none';
+  /** 추천과 다른 중량으로 수행했을 때 사용자가 고른 사유(선택) */
+  editReason?: string;
   exerciseId: string;
   instanceId?: string;
   plannedSetId?: string;
@@ -207,7 +226,21 @@ export interface Recommendation {
 
 export type ProgressionAction = 'increase' | 'hold' | 'hold_or_reduce' | 'review' | 'not_counted';
 
+export interface ProgressionDecisionFastTrack {
+  applied: boolean;
+  /** 보정에 쓴 Top Set 기록. 같은 기록으로 두 번 보정하지 않는다 */
+  sourceId: string;
+  base: number;
+  rtsLoad: number | null;
+  cap: number | null;
+  raw: number;
+  rounded: number;
+  rounding: string;
+  step: number;
+}
+
 export interface ProgressionDecision {
+  fastTrack?: ProgressionDecisionFastTrack;
   action: ProgressionAction;
   nextLoad: number | null;
   failStreak: number;
@@ -220,6 +253,21 @@ export interface ProgressionDecision {
   prevFailStreak?: number;
 }
 
+export interface FirstSessionSummary {
+  date: ISODate;
+  recommendedLoad: number | null;
+  method: string;
+  confidence: 'record' | 'estimate' | 'none';
+  baseExerciseId?: string;
+  kBase?: number;
+  kIndividual?: number;
+  actualLoad: number | null;
+  modified: boolean;
+  sets: { weight: number | null; reps?: number; seconds?: number; rpe?: number }[];
+  nextLoad: number | null;
+  action: ProgressionAction | null;
+}
+
 export interface ExerciseState {
   exerciseId: string;
   /** 다음 세션 추천 작업 중량(Top/Straight/DP 공통) */
@@ -229,6 +277,10 @@ export interface ExerciseState {
   k: number;
   /** 첫 실행 시 입력한 기준 기록 */
   seed?: { weight: number; reps: number; rpe: number; bodyweight?: number };
+  /** 머신·케이블 장비 정보(같은 이름이라도 기구가 다르면 중량이 다르다) */
+  equipment?: { id?: string; unit?: 'kg' | 'lb'; pinStep?: number; note?: string };
+  /** 첫 세션 요약: 최초 추천과 실제 수행, 진행 시작 상태 */
+  firstSession?: FirstSessionSummary;
   lastDecision?: ProgressionDecision;
   updatedAt: ISODateTime;
 }
@@ -362,6 +414,12 @@ export interface Settings {
   barWeight: number;
   /** 보유 원판(kg, 한쪽에 끼울 수 있는 종류) */
   plates: number[];
+  /** 세트 종류별 반올림 정책(Top·Backoff·최초·Fast-track·감량·세트 중 증량) */
+  roundingPolicy?: Partial<Record<'top' | 'backoff' | 'start' | 'fast_track' | 'reduce' | 'next_set', 'nearest' | 'floor' | 'ceil'>>;
+  /** Fast-track 상한: 지난 작업 중량 대비 최대 증량 비율 */
+  fastTrackMaxPct?: number;
+  /** ARM 운동별 기준 1RM(kg). PDF %1RM 처방을 계산할 때만 쓴다 */
+  armOneRm?: Record<string, number>;
   /** 대회 날짜. 홈에 남은 날을 보여 준다 */
   meetDate?: ISODate | null;
   /** 종류별 보유 쌍 수. 없으면 plates의 종류를 제한 없이 쓴다 */

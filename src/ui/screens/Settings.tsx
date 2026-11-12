@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { Db, ExerciseState, ISODate, Patch } from '../../domain/types';
 import { fmtDateKo, isISODate, weekStart } from '../../engine/dates';
-import { minBarbellStep, PlateStock } from '../../engine/rounding';
+import { DEFAULT_ROUNDING_POLICY, minBarbellStep, PlateStock, ROUND_KIND_KO, RoundKind } from '../../engine/rounding';
 import { setSeed } from '../../application/session';
 import { BackupCheck, buildBackup, parseBackup } from '../../data-import/backup';
 import { performedCsv } from '../../application/analysis';
@@ -120,6 +120,8 @@ const download = (name: string, text: string, type = 'application/json') => {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+const MODES: ['nearest' | 'floor' | 'ceil', string][] = [['nearest', '가까운 쪽'], ['floor', '내림'], ['ceil', '올림']];
 
 export const SettingsScreen = () => {
   const { db, persisted, canInstall, installed } = useApp();
@@ -240,17 +242,40 @@ export const SettingsScreen = () => {
       </div>
       <p className="mt-1 text-xs text-dust">최근에 한 세트 하나(중량·반복·RPE)를 넣으면 보수적 e1RM으로 첫 Top Set을 제안합니다. 비워 두면 첫 세션에서 직접 입력합니다.</p>
 
-      <SectionTitle>운동별 증량·반올림 단위</SectionTitle>
+      <SectionTitle>중량 반올림</SectionTitle><p className="-mt-1 pb-2 text-xs text-dust">계산은 끝까지 소수로 하고 마지막에 한 번만 반올림합니다.</p>
+      <div className="divide-y divide-rail rounded-xl bg-steel px-3">
+        {(Object.keys(DEFAULT_ROUNDING_POLICY) as RoundKind[]).map((k) => (
+          <Row key={k} label={ROUND_KIND_KO[k]}>
+            <select className="field w-28" value={s.roundingPolicy?.[k] ?? DEFAULT_ROUNDING_POLICY[k]} aria-label={`${ROUND_KIND_KO[k]} 반올림`} onChange={(ev) => void run(() => ({ settings: { roundingPolicy: { ...s.roundingPolicy, [k]: ev.target.value as 'nearest' | 'floor' | 'ceil' } } }))}>
+              {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Row>
+        ))}
+        <Row label="Fast-track 최대 증가">
+          <select className="field num w-28" value={s.fastTrackMaxPct ?? 0.05} aria-label="Fast-track 최대 증가율" onChange={(ev) => void run(() => ({ settings: { fastTrackMaxPct: Number(ev.target.value) } }))}>
+            {[0.025, 0.05, 0.075, 0.1].map((n) => <option key={n} value={n}>{(n * 100).toFixed(1).replace('.0', '')}%</option>)}
+          </select>
+        </Row>
+      </div>
+
+      <SectionTitle>운동별 단위</SectionTitle><p className="-mt-1 pb-2 text-xs text-dust">증량은 다음 세션에 올리는 폭, 중량 단위는 실제로 맞출 수 있는 가장 작은 차이입니다.</p>
       <div className="divide-y divide-rail rounded-xl bg-steel px-3">
         {Object.values(db.exercises).filter((e) => e.role !== 'arm').map((e) => (
-          <div key={e.id} className="flex min-h-[48px] items-center justify-between gap-2 py-1 text-sm">
-            <span className="min-w-0 truncate">{e.name}</span>
-            <span className="flex shrink-0 gap-1.5">
-              <select className="field num w-24" value={e.increment} aria-label={`${e.name} 증량 단위`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, increment: Number(ev.target.value) }] } }))}>
-                {[...new Set([0.5, 1, 1.25, 2, 2.5, 5, e.increment])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}kg</option>)}
+          <div key={e.id} className="py-2 text-sm">
+            <div className="truncate">{e.name}</div>
+            <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+              <select className="field num" value={e.increment} aria-label={`${e.name} 증량`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, increment: Number(ev.target.value) }] } }))}>
+                {[...new Set([0.5, 1, 1.25, 2, 2.5, 5, e.increment])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>증량 {n}</option>)}
               </select>
-              <select className="field w-20" value={e.rounding} aria-label={`${e.name} 반올림`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, rounding: ev.target.value as 'down' | 'nearest' }] } }))}><option value="down">내림</option><option value="nearest">반올림</option></select>
-            </span>
+              <select className="field num" value={e.loadStep ?? ''} aria-label={`${e.name} 중량 단위`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, loadStep: ev.target.value === '' ? undefined : Number(ev.target.value) }] } }))}>
+                <option value="">단위 자동</option>
+                {[0.5, 1, 1.25, 2, 2.5, 5].map((n) => <option key={n} value={n}>단위 {n}</option>)}
+              </select>
+              <select className="field" value={e.roundingOverride ?? ''} aria-label={`${e.name} 반올림`} onChange={(ev) => void run(() => ({ put: { exercises: [{ ...e, roundingOverride: ev.target.value === '' ? undefined : ev.target.value as 'nearest' | 'floor' | 'ceil' }] } }))}>
+                <option value="">정책 따름</option>
+                {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </div>
           </div>
         ))}
       </div>

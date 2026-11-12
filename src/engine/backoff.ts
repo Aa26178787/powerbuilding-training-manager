@@ -1,6 +1,6 @@
 // Top Set → Backoff 중량 추천, 세트 간 자동 조절 제안 (SRS FR-022, FR-030, FR-031)
 import { conservativeE1RM, impliedE1RM, loadForTarget, FORMULA_VERSION } from './e1rm';
-import { roundLoad } from './rounding';
+import { roundLoad, Rounding } from './rounding';
 
 export interface BackoffInput {
   /** external: 바벨 중량 / bodyweight_plus: 추가 중량 */
@@ -12,7 +12,7 @@ export interface BackoffInput {
   /** 개인 보정계수(기본 1.000) */
   k: number;
   increment: number;
-  rounding: 'down' | 'nearest';
+  rounding: Rounding;
   /** 딥스·풀업: 체중(kg). 지정 시 system_load = 체중 + 추가 중량으로 계산 */
   bodyweight?: number;
 }
@@ -51,9 +51,11 @@ export interface NextSetInput {
   /** 세트가 진행되며 예상되는 RPE 상승폭 */
   drift: number;
   increment: number;
-  rounding: 'down' | 'nearest';
+  rounding: Rounding;
   isFirstBackoff: boolean;
   bodyweight?: number;
+  /** 가벼울 때 올리는 경우의 반올림(기본: rounding과 같음) */
+  increaseRounding?: Rounding;
 }
 export interface NextSetAdvice {
   action: 'keep' | 'decrease' | 'increase';
@@ -68,9 +70,9 @@ export interface NextSetAdvice {
 export const adviseNextSet = (i: NextSetInput): NextSetAdvice => {
   const bw = i.bodyweight ?? 0;
   const predicted = Math.min(10, i.lastRpe + i.drift);
-  const retarget = (rpe: number) => {
+  const retarget = (rpe: number, mode: Rounding = i.rounding) => {
     const e = impliedE1RM(i.load + bw, i.reps, i.lastRpe);
-    return roundLoad(Math.max(0, loadForTarget(e, i.reps, rpe) - bw), i.increment, i.rounding);
+    return roundLoad(Math.max(0, loadForTarget(e, i.reps, rpe) - bw), i.increment, mode);
   };
   if (i.lastRpe > i.rpeCap || predicted > i.rpeCap) {
     let load = retarget(Math.max(5, i.rpeCap - 0.5));
@@ -83,9 +85,9 @@ export const adviseNextSet = (i: NextSetInput): NextSetAdvice => {
     };
   }
   if (i.isFirstBackoff && i.lastRpe <= i.targetRpe - 1) {
-    const load = retarget(i.targetRpe);
+    const load = retarget(i.targetRpe, i.increaseRounding ?? i.rounding);
     if (load > i.load) {
-      return { action: 'increase', load, predictedRpe: predicted, offerStop: false, reason: `첫 Backoff가 @${i.lastRpe}로 목표 @${i.targetRpe}보다 가볍습니다. 올려도 됩니다` };
+      return { action: 'increase', load, predictedRpe: predicted, offerStop: false, reason: `직전 세트가 @${i.lastRpe}로 목표 @${i.targetRpe}보다 가볍습니다. 올려도 됩니다` };
     }
   }
   return { action: 'keep', load: i.load, predictedRpe: predicted, offerStop: false, reason: `직전 세트 @${i.lastRpe}. 같은 중량으로 갑니다` };
@@ -94,7 +96,7 @@ export const adviseNextSet = (i: NextSetInput): NextSetAdvice => {
 /** Variation 첫 수행 시작 중량: Comp e1RM × k_base × k_personal에서 목표 반복·RPE로 환산 (SRS FR-032) */
 export const variationStartLoad = (
   compE1rm: number, kBase: number, kPersonal: number, targetReps: number, targetRpe: number,
-  increment: number, rounding: 'down' | 'nearest' = 'down',
+  increment: number, rounding: Rounding = 'down',
 ) => {
   const est = compE1rm * kBase * kPersonal;
   const raw = loadForTarget(est, targetReps, targetRpe);

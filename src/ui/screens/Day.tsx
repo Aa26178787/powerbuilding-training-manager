@@ -6,11 +6,12 @@ import { m } from 'motion/react';
 import { Check, ChevronLeft, ChevronRight, Ellipsis, Flag, Minus, Play, Plus, SkipForward, Timer, Undo2, X } from 'lucide-react';
 import type { Db, ISODate, IssueFlag, PerformedSet, PlannedSet, Side } from '../../domain/types';
 import { addDays, fmtDateKo, weekdayOf } from '../../engine/dates';
-import { plateBreakdown } from '../../engine/rounding';
+import { plateBreakdown, roundingNote, ROUNDING_KO } from '../../engine/rounding';
+import { calibrateInitialLoad, CONFIDENCE_KO, LOAD_UNIT_KO, METHOD_KO } from '../../engine/initialLoad';
 import { dayView, DayGroupView } from '../../application/selectors';
-import { armVariantKey, lastSessionSets, suggestForSet, Suggestion } from '../../application/recommend';
+import { armVariantKey, bodyweightFor, lastSessionSets, modeOf, stepOf, suggestForSet, Suggestion } from '../../application/recommend';
 import {
-  activeSession, deletePerformedSet, editPerformedSet, endSession, markSetDone, recordArmRow, recordSet, SessionReport,
+  activeSession, deletePerformedSet, setEquipment, editPerformedSet, endSession, markSetDone, recordArmRow, recordSet, SessionReport,
   setNextLoad, setSessionBodyweight, skipSets, startSession, unskipSet,
 } from '../../application/session';
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
@@ -129,20 +130,35 @@ const RecordSheet = ({ t, onClose }: { t: EditTarget; onClose: () => void }) => 
 const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop: () => void; openCount: number; disabled: boolean }) => {
   const [why, setWhy] = useState(false);
   if (!sug.message) return null;
+  const b = sug.basis;
+  const rows: [string, string][] = [];
+  if (sug.method) rows.push(['산출 방법', METHOD_KO[sug.method]]);
+  if (sug.confidence) rows.push(['추천 신뢰도', CONFIDENCE_KO[sug.confidence]]);
+  if (b?.baseExercise) rows.push(['기준 운동', b.baseExercise]);
+  if (b?.e1rm !== undefined) rows.push(['사용한 e1RM', `${(Math.round(b.e1rm * 10) / 10).toFixed(1)}kg`]);
+  if (b?.kBase !== undefined) rows.push(['환산계수', `k_base ${b.kBase} × k ${(b.kIndividual ?? 1).toFixed(3)}`]);
+  if (b) rows.push(['목표', `${b.targetReps}회 @${b.targetRpe}`]);
+  if (sug.round && sug.load !== null) rows.push(['반올림', `${ROUNDING_KO[sug.round.mode]}, ${sug.round.step}kg 단위`]);
+  rows.push(['개인화 보정', sug.personalized ? '적용' : '없음']);
+  if (sug.kind === 'progression') rows.push(['Fast-track', sug.fastTrack ? '적용' : '아님']);
   return (
     <div className="mt-2.5">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          {sug.load !== null && <div className="text-[13px] leading-none font-semibold">추천 <span className="num-d text-[18px]">{fmtKg(sug.load)}</span>kg</div>}
+          {sug.load !== null && (
+            <div className="flex items-baseline gap-2 text-[13px] leading-none font-semibold">
+              <span>추천 <span className="num-d text-[18px]">{fmtKg(sug.load)}</span>kg</span>
+              {sug.confidence && <span className="text-[11px] font-normal text-dust">{CONFIDENCE_KO[sug.confidence]}</span>}
+            </div>
+          )}
+          {sug.round && sug.load !== null && <div className="num mt-1 text-[11.5px] text-dust">{roundingNote(sug.round.raw, sug.load, sug.round.mode, sug.round.step)}</div>}
           <p className={cx('text-[12.5px] leading-[1.45]', sug.load !== null && 'mt-1', sug.action === 'decrease' ? 'text-p25' : 'text-dust')}>{sug.message}</p>
         </div>
-        {sug.detail && <Chip onClick={() => setWhy(!why)} aria-expanded={why}>{why ? '접기' : '근거'}</Chip>}
+        {(rows.length > 2 || sug.detail) && <Chip onClick={() => setWhy(!why)} aria-expanded={why}>{why ? '접기' : '근거'}</Chip>}
       </div>
-      {why && sug.detail && (<Reveal>
-        <dl className="num mt-2 grid grid-cols-2 gap-x-3 rounded-lg bg-deck px-3 py-2 text-[11px] text-dust">
-          {Object.entries(sug.detail).filter(([, v]) => typeof v === 'number' || typeof v === 'string').map(([k, v]) => (
-            <div key={k} className="contents"><dt>{k}</dt><dd className="text-right">{typeof v === 'number' ? Math.round(v * 1000) / 1000 : String(v)}</dd></div>
-          ))}
+      {why && (<Reveal>
+        <dl className="num mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-0.5 rounded-lg bg-deck px-3 py-2 text-[12px]">
+          {rows.map(([k, v]) => <div key={k} className="contents"><dt className="text-dust">{k}</dt><dd className="text-right">{v}</dd></div>)}
         </dl></Reveal>
       )}
       {sug.offerStop && openCount > 0 && <Btn className="mt-1.5 w-full" onClick={onStop} disabled={disabled}>남은 {openCount}세트 조기 종료</Btn>}
@@ -183,7 +199,7 @@ const BarDiagram = ({ perSide }: { perSide: number[] }) => {
 const RPES = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
 /** RPE 9칸. 선택은 흰색, 목표 범위는 밑줄, 상한 초과 선택은 빨강 */
 const RpeCells = ({ value, onChange, lo, hi, cap, disabled }: { value: number | null; onChange: (v: number | null) => void; lo?: number; hi?: number; cap?: number; disabled?: boolean }) => (
-  <div role="radiogroup" aria-label="실제 RPE" className="grid grid-cols-9 gap-1">
+  <div role="radiogroup" aria-label="실제 RPE" data-dense className="grid grid-cols-9 gap-1">
     {RPES.map((r) => {
       const sel = value === r;
       const inTarget = lo !== undefined && r >= lo && r <= (hi ?? lo);
@@ -248,6 +264,45 @@ const SetStrip = ({ g, date, activeId, onEdit, labelOf, valueOf }: {
 );
 
 /** 파워빌딩 운동 입력 구역 */
+/** 기록이 없을 때: 가벼운 세트 하나로 시작 중량을 정한다 */
+type Calib = { load: number | null; raw: number; e1rm: number; inputs: Record<string, unknown> };
+const CalibratePanel = ({ db, g, date, sug, disabled, onUse }: { db: Db; g: DayGroupView; date: ISODate; sug: Suggestion; disabled: boolean; onUse: (c: Calib) => void }) => {
+  const [w, setW] = useState(''); const [r, setR] = useState('5'); const [e, setE] = useState<number | null>(null);
+  const bwPlus = g.exercise.loadMode === 'bodyweight_plus';
+  const bw = bwPlus ? bodyweightFor(db, date) : 0;
+  const target = { reps: sug.basis?.targetReps ?? 5, rpe: sug.basis?.targetRpe ?? 7.5 };
+  const step = stepOf(db, g.exercise); const mode = modeOf(db, g.exercise, 'start');
+  const ready = w !== '' && Number(r) > 0 && e !== null && (!bwPlus || !!bw);
+  const res = ready ? calibrateInitialLoad({ warmup: { weight: Number(w), reps: Number(r), rpe: e! }, target, increment: step, rounding: mode, bodyweight: bw ?? 0 }) : null;
+  return (
+    <div className="mt-2.5 rounded-lg bg-deck px-3 py-2.5">
+      <div className="text-[12.5px] font-semibold">가벼운 세트로 시작 중량 정하기</div>
+      <p className="mt-0.5 text-[11.5px] leading-[1.45] text-dust">한 세트를 해 보고 중량·반복·RPE를 넣으면 {target.reps}회 @{target.rpe} 중량을 계산합니다. 이 세트는 기록에 남지 않습니다.</p>
+      {bwPlus && !bw && <p className="mt-1 text-[11.5px] text-p25">맨 위에서 오늘 체중을 먼저 넣으세요.</p>}
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="text-[11px] text-dust">{bwPlus ? '추가 중량' : '중량'} kg
+          <input className="num-d mt-0.5 h-10 w-full rounded-md bg-iron text-center text-[20px] font-bold outline-none" type="number" inputMode="decimal" step="any" value={w} disabled={disabled} onChange={(x) => setW(x.target.value)} />
+        </label>
+        <label className="text-[11px] text-dust">반복
+          <input className="num-d mt-0.5 h-10 w-full rounded-md bg-iron text-center text-[20px] font-bold outline-none" type="number" inputMode="numeric" value={r} disabled={disabled} onChange={(x) => setR(x.target.value)} />
+        </label>
+      </div>
+      <div className="mt-2"><RpeCells value={e} onChange={setE} disabled={disabled} /></div>
+      {res && (
+        <div className="mt-2 flex items-center gap-3">
+          <div className="num min-w-0 flex-1 text-[12px] text-dust">
+            {res.assistNeeded ? <span className="text-p25">체중만으로도 무겁습니다. 보조를 쓰세요.</span>
+              : <>e1RM {res.e1rm.toFixed(1)}kg, {roundingNote(Math.max(res.raw, Number(w)), res.rounded ?? 0, mode, step)}</>}
+          </div>
+          {!res.assistNeeded && <Btn disabled={disabled} onClick={() => onUse({ load: res.rounded, raw: res.raw, e1rm: res.e1rm, inputs: { warmup: { weight: Number(w), reps: Number(r), rpe: e }, target, bodyweight: bw, step, rounding: mode, formulaVersion: res.formulaVersion } })}>이 중량으로 시작</Btn>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EDIT_REASONS = ['컨디션', '장비 차이', '기술 연습', '통증 주의'];
+
 const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
   db: Db; g: DayGroupView; date: ISODate; focused: boolean; disabled: boolean; onEdit: (t: EditTarget) => void;
 }) => {
@@ -266,15 +321,21 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
   const [flags, setFlags] = useState<IssueFlag[]>([]);
   const [showFlags, setShowFlags] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [calib, setCalib] = useState<Calib | null>(null);
+  const [reason, setReason] = useState<string | null>(null);
+  const [assist, setAssist] = useState<'band' | 'machine' | null>(null);
   // 다음 세트로 넘어가거나 추천값이 바뀌면 새로 채운다(같은 세트 안에서 고친 값은 유지)
   useEffect(() => {
-    setWeight(initW === null ? '' : String(initW)); setReps(String(initR)); setRpe(null); setFlags([]); setShowFlags(false);
+    setWeight(initW === null ? '' : String(initW)); setReps(String(initR)); setRpe(null); setFlags([]); setShowFlags(false); setReason(null); setCalib(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, sug?.load]);
   const w = weight === '' ? null : Number(weight);
   const plates = g.exercise.barbell && w !== null && w > 0 ? plateBreakdown(w, db.settings.barWeight, db.settings.plates, db.settings.plateStock) : null;
   const open = g.sets.filter((s) => s.status === 'planned');
   const bumpW = (d: number) => setWeight(String(Math.max(0, Math.round(((Number(weight) || 0) + d) * 1000) / 1000)));
+  const recLoad = calib ? calib.load : sug?.load ?? null;
+  const edited = w !== null && recLoad !== null && Math.abs(w - recLoad) > 1e-6;
+  const unitLbl = g.exercise.loadUnit && g.exercise.loadUnit !== 'total' ? LOAD_UNIT_KO[g.exercise.loadUnit] : null;
   const bumpR = (d: number) => setReps(String(Math.max(0, (Number(reps) || 0) + d)));
 
   const complete = async () => {
@@ -282,7 +343,7 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
     setBusy(true);
     const n = Number(reps);
     const r = await run<string>((d, ctx) => {
-      const patch = recordSet(d, { plannedSetId: active.id, exerciseId: g.exercise.id, date, weight: w, rpe: rpe ?? undefined, flags, ...(active.seconds ? { seconds: n } : { reps: n }) }, ctx);
+      const patch = recordSet(d, { plannedSetId: active.id, exerciseId: g.exercise.id, date, weight: w, rpe: rpe ?? undefined, flags, ...(assist ? { assist } : {}), ...(calib ? { calibration: { load: calib.load, raw: calib.raw, method: 'warmup', confidence: 'estimate' as const, inputs: calib.inputs } } : {}), ...(reason && edited ? { editReason: reason } : {}), ...(active.seconds ? { seconds: n } : { reps: n }) }, ctx);
       return { patch, result: patch.put!.performed![0].id };
     });
     setBusy(false);
@@ -312,7 +373,8 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
               </div>
             </>
           )}
-          {g.exercise.loadMode === 'bodyweight_plus' && <div className="text-center text-[12px] text-dust">추가 중량(벨트에 다는 무게)</div>}
+          {g.exercise.loadMode === 'bodyweight_plus' && <div className="text-center text-[12px] text-dust">{assist ? `보조(${assist === 'band' ? '밴드' : '머신'}) 사용, 중량은 0으로` : '추가 중량(벨트에 다는 무게)'}</div>}
+          {unitLbl && <div className="text-center text-[12px] text-dust">{unitLbl} 기준</div>}
           <div className="mt-2.5"><BigNumber value={weight} onChange={setWeight} onStep={bumpW} step={inc} unit="kg" label={`${labelOf(active)} 중량`} disabled={disabled} /></div>
           <div className="mx-auto mt-1 max-w-[220px]"><BigNumber value={reps} onChange={setReps} onStep={bumpR} step={1} unit={unit} label={`${labelOf(active)} ${active.seconds ? '유지 시간' : '반복수'}`} size="md" disabled={disabled} /></div>
           <div className="mt-3"><RpeCells value={rpe} onChange={setRpe} lo={active.targetRpe} hi={active.targetRpeMax} cap={active.rpeCap} disabled={disabled} /></div>
@@ -324,11 +386,25 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
             <Chip disabled={disabled} onClick={() => void run((d, ctx) => skipSets(d, [active.id], false, '사용자 스킵', ctx))}><SkipForward size={13} aria-hidden />이 세트 건너뛰기</Chip>
           </div>
           {showFlags && <Reveal className="mt-2"><FlagPicker flags={flags} onChange={setFlags} /></Reveal>}
+          {g.exercise.loadMode === 'bodyweight_plus' && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-dust">
+              <span>보조</span>
+              {(['band', 'machine'] as const).map((a) => <Chip key={a} className={cx(assist === a && '!bg-chalk !text-iron')} aria-pressed={assist === a} onClick={() => { setAssist(assist === a ? null : a); if (assist !== a) setWeight('0'); }}>{a === 'band' ? '밴드' : '머신'}</Chip>)}
+            </div>
+          )}
+          {edited && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-dust">
+              <span className="w-full">추천 {fmtKg(recLoad!)}kg에서 바꾼 이유(선택)</span>
+              {EDIT_REASONS.map((x) => <Chip key={x} className={cx(reason === x && '!bg-chalk !text-iron')} aria-pressed={reason === x} onClick={() => setReason(reason === x ? null : x)}>{x}</Chip>)}
+            </div>
+          )}
         </div>
       )}
+      {focused && active && sug?.needsCalibration && doneHere.length === 0 && !calib && <CalibratePanel db={db} g={g} date={date} sug={sug} disabled={disabled} onUse={(c) => { setCalib(c); if (c.load !== null) setWeight(String(c.load)); }} />}
+      {focused && calib && <p className="num mt-2 text-[12px] text-dust">가벼운 세트로 정한 시작 중량 {calib.load === null ? '-' : `${fmtKg(calib.load)}kg`} (e1RM {calib.e1rm.toFixed(1)}kg, 추정치) <button className="hit ml-1 underline-offset-2 text-chalk" onClick={() => setCalib(null)}>다시</button></p>}
       <SetStrip g={g} date={date} activeId={focused ? active?.id : undefined} onEdit={onEdit} labelOf={labelOf} valueOf={(perf) => short(perf[0])} />
       {focused && sug && sug.kind !== 'none' && <Advice sug={sug} onStop={stopRest} openCount={open.length} disabled={disabled} />}
-      {focused && sug?.kind === 'none' && sug.message && <p className="mt-2.5 text-[12.5px] leading-[1.45] text-dust">{sug.message}</p>}
+      {focused && sug?.kind === 'none' && sug.message && !(sug.needsCalibration && doneHere.length === 0) && <p className="mt-2.5 text-[12.5px] leading-[1.45] text-dust">{sug.message}</p>}
       {g.extras.length > 0 && <div className="num mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-dust"><span>계획 외 세트</span>{g.extras.map((p) => <Chip key={p.id} onClick={() => onEdit({ perf: p, group: g, date })}>{short(p)}</Chip>)}</div>}
       {focused && active && (
         <ActionBar onClick={complete} disabled={disabled || busy || reps === '' || (weight === '' && g.exercise.loadMode !== 'bodyweight_plus')}>
@@ -345,8 +421,7 @@ const ArmTable = ({ db, g, date, focused, disabled, onEdit }: {
 }) => {
   const separate = db.settings.armSideMode === 'separate';
   const history = lastSessionSets(db, g.exercise.id, date, armVariantKey(db, g.instance.id));
-  const any = history.length ? history : lastSessionSets(db, g.exercise.id, date);
-  const prevW = (side: Side) => any.find((p) => p.side === side || p.side === 'both')?.weight;
+  const prevW = (side: Side) => history.find((p) => p.side === side || p.side === 'both')?.weight;
   const active = g.sets.find((s) => s.status === 'planned');
   const [left, setLeft] = useState(prevW('L') != null ? String(prevW('L')) : '');
   const [right, setRight] = useState(prevW('R') != null ? String(prevW('R')) : '');
@@ -429,6 +504,46 @@ const ArmFill = ({ g }: { g: DayGroupView }) => {
 };
 
 /** 운동별 메뉴: 순서·세트 수·계획 외 세트·PDF 원문·영상 */
+const EquipmentForm = ({ db, exerciseId, disabled }: { db: Db; exerciseId: string; disabled: boolean }) => {
+  const eq = db.exStates[exerciseId]?.equipment;
+  const [id, setId] = useState(eq?.id ?? ''); const [pin, setPin] = useState(eq?.pinStep ? String(eq.pinStep) : ''); const [note, setNote] = useState(eq?.note ?? '');
+  const save = async () => {
+    const r = await run((d, ctx) => setEquipment(d, exerciseId, id || pin || note ? { id: id || undefined, unit: 'kg', pinStep: pin ? Number(pin) : undefined, note: note || undefined } : undefined, ctx));
+    if (r.ok) toast('장비 정보를 저장했습니다');
+  };
+  return (
+    <div className="mt-3 rounded-lg bg-deck p-2.5 text-sm">
+      <div className="text-xs text-dust">장비 정보(헬스장·기구가 바뀌면 중량이 달라질 수 있어 함께 남깁니다)</div>
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+        <input className="field" placeholder="기구 이름·번호" value={id} onChange={(e) => setId(e.target.value)} aria-label="기구 이름·번호" />
+        <input className="field num" placeholder="핀 간격 kg" type="number" inputMode="decimal" step="any" value={pin} onChange={(e) => setPin(e.target.value)} aria-label="핀 간격" />
+        <input className="field col-span-2" placeholder="메모(시트 높이 등)" value={note} onChange={(e) => setNote(e.target.value)} aria-label="장비 메모" />
+      </div>
+      <Btn className="mt-1.5 w-full" disabled={disabled} onClick={save}>장비 정보 저장</Btn>
+    </div>
+  );
+};
+
+const ArmOneRmForm = ({ db, exerciseId, disabled }: { db: Db; exerciseId: string; disabled: boolean }) => {
+  const cur = db.settings.armOneRm?.[exerciseId];
+  const [v, setV] = useState(cur ? String(cur) : '');
+  const save = async () => {
+    const n = v === '' ? null : Number(v);
+    if (n !== null && !(n > 0 && n < 500)) { toast('1RM 값을 확인하세요', 'error'); return; }
+    const next = { ...db.settings.armOneRm }; if (n === null) delete next[exerciseId]; else next[exerciseId] = n;
+    const r = await run(() => ({ settings: { armOneRm: next } }));
+    if (r.ok) toast(n === null ? '기준 1RM을 지웠습니다' : '기준 1RM을 저장했습니다');
+  };
+  return (
+    <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-deck p-2.5 text-sm">
+      <label className="min-w-0 flex-1 text-xs text-dust">기준 1RM(PDF %1RM 처방 계산용)
+        <input className="field num mt-1 w-full" type="number" inputMode="decimal" step="any" value={v} onChange={(e) => setV(e.target.value)} />
+      </label>
+      <Btn className="self-end" disabled={disabled} onClick={save}>저장</Btn>
+    </div>
+  );
+};
+
 const CardMenu = ({ db, g, date, disabled, isFirst, isLast, onEdit, onClose }: { db: Db; g: DayGroupView; date: ISODate; disabled: boolean; isFirst: boolean; isLast: boolean; onEdit: (t: EditTarget) => void; onClose: () => void }) => {
   const active = g.sets.find((s) => s.status === 'planned');
   const arm = g.instance.arm;
@@ -449,6 +564,8 @@ const CardMenu = ({ db, g, date, disabled, isFirst, isLast, onEdit, onClose }: {
         <Btn disabled={disabled || !active} onClick={reduceOne}>세트 줄이기</Btn>
         <Btn className="col-span-2" disabled={disabled} onClick={() => { onClose(); onEdit({ group: g, date }); }}>계획 외 세트 기록</Btn>
       </div>
+      {!arm && g.exercise.role !== 'comp' && <EquipmentForm db={db} exerciseId={g.exercise.id} disabled={disabled} />}
+      {arm && arm.percent1rm != null && <ArmOneRmForm db={db} exerciseId={g.exercise.id} disabled={disabled} />}
       {arm && (
         <div className="mt-3 space-y-1 text-sm">
           <div className="text-xs text-dust">PDF {arm.sourcePage}쪽 원문</div>
@@ -699,7 +816,7 @@ export const DayScreen = ({ date, onDate, onCalendar }: { date: ISODate; onDate:
             {!before && onCalendar && (
               <div className="mt-5 flex items-center gap-3 border-t border-rail pt-4">
                 <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-dust">다른 날 운동을 오늘로 옮기려면 캘린더에서 고릅니다.</p>
-                <button type="button" className="press h-10 shrink-0 rounded-[10px] border border-rail px-3.5 text-[13px] font-semibold" onClick={onCalendar}>캘린더</button>
+                <button type="button" className="press h-11 shrink-0 rounded-[10px] border border-rail px-3.5 text-[13px] font-semibold" onClick={onCalendar}>캘린더</button>
               </div>
             )}
           </section>

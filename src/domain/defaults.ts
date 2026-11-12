@@ -13,20 +13,20 @@ export const DEFAULT_EXERCISES: Exercise[] = [
   ex('conv_dl', 'Conventional Deadlift', 'strength', 'hinge', 2.5, { barbell: true }),
   ex('dips_strength', 'Weighted Dips (Strength)', 'strength', 'dips', 1.25, { loadMode: 'bodyweight_plus' }),
   ex('pullup_strength', 'Weighted Pull-up (Strength)', 'strength', 'pullup', 1.25, { loadMode: 'bodyweight_plus' }),
-  ex('sng_bench', 'Competition Stop-and-go Bench', 'variation', 'bench', 1.25, { barbell: true }),
+  ex('sng_bench', 'Competition Stop-and-go Bench', 'variation', 'bench', 1.25, { barbell: true, variationOf: { compExerciseId: 'comp_bench', kBase: 1 } }),
   ex('highbar_squat', 'High-bar Squat', 'variation', 'squat', 2.5, { barbell: true, variationOf: { compExerciseId: 'comp_squat', kBase: 0.925 } }),
   ex('larsen_bench', 'Larsen Bench', 'variation', 'bench', 1.25, { barbell: true, variationOf: { compExerciseId: 'comp_bench', kBase: 0.925 } }),
   ex('rdl', 'Romanian Deadlift', 'variation', 'hinge', 2.5, { barbell: true }),
-  ex('dips_volume', 'Weighted Dips (Volume)', 'accessory', 'dips', 1.25, { loadMode: 'bodyweight_plus' }),
-  ex('pullup_volume', 'Weighted Pull-up (Volume)', 'accessory', 'pullup', 1.25, { loadMode: 'bodyweight_plus' }),
-  ex('cs_row', 'Chest-supported Row', 'accessory', 'row', 2.5),
-  ex('incline_db', 'Incline DB Press', 'accessory', 'chest_acc', 2),
-  ex('cable_lateral', 'Cable Lateral Raise', 'accessory', 'delts', 1.25),
-  ex('rev_pec_deck', 'Reverse Pec Deck', 'accessory', 'delts', 2.5),
-  ex('leg_ext', 'Leg Extension', 'accessory', 'quads', 2.5),
-  ex('leg_curl', 'Seated Leg Curl', 'accessory', 'hams', 2.5),
-  ex('hlr', 'Hanging Leg Raise', 'accessory', 'core', 1.25),
-  ex('oh_triceps', 'Overhead Cable Triceps Extension', 'accessory', 'triceps', 1.25),
+  ex('dips_volume', 'Weighted Dips (Volume)', 'accessory', 'dips', 1.25, { loadMode: 'bodyweight_plus', relatedOf: { exerciseId: 'dips_strength', kBase: 1 } }),
+  ex('pullup_volume', 'Weighted Pull-up (Volume)', 'accessory', 'pullup', 1.25, { loadMode: 'bodyweight_plus', relatedOf: { exerciseId: 'pullup_strength', kBase: 1 } }),
+  ex('cs_row', 'Chest-supported Row', 'accessory', 'row', 2.5, { loadUnit: 'machine' }),
+  ex('incline_db', 'Incline DB Press', 'accessory', 'chest_acc', 2, { loadUnit: 'per_hand' }),
+  ex('cable_lateral', 'Cable Lateral Raise', 'accessory', 'delts', 1.25, { loadUnit: 'machine' }),
+  ex('rev_pec_deck', 'Reverse Pec Deck', 'accessory', 'delts', 2.5, { loadUnit: 'machine' }),
+  ex('leg_ext', 'Leg Extension', 'accessory', 'quads', 2.5, { loadUnit: 'machine' }),
+  ex('leg_curl', 'Seated Leg Curl', 'accessory', 'hams', 2.5, { loadUnit: 'machine' }),
+  ex('hlr', 'Hanging Leg Raise', 'accessory', 'core', 1.25, { bodyweightOnly: true }),
+  ex('oh_triceps', 'Overhead Cable Triceps Extension', 'accessory', 'triceps', 1.25, { loadUnit: 'machine' }),
 ];
 
 export const MUSCLES: [string, string][] = [
@@ -157,3 +157,17 @@ export const emptyDb = () => ({
   exercises: {}, versions: {}, workouts: {}, instances: {}, plannedSets: {}, performed: {}, sessions: {},
   recs: {}, changes: {}, exStates: {}, coeffs: {}, armOverrides: {}, armLinks: {}, audit: {}, arm: null,
 });
+
+/** 예전 버전에서 만든 운동 목록에 새 기본 속성(환산 기준, 중량 단위 등)을 채운다. 사용자가 바꾼 값은 건드리지 않는다 */
+export const exerciseDefaultsPatch = (existing: Record<string, Exercise>): Exercise[] => {
+  const keys = ['variationOf', 'relatedOf', 'loadUnit', 'bodyweightOnly'] as const;
+  const out: Exercise[] = [];
+  for (const d of DEFAULT_EXERCISES) {
+    const cur = existing[d.id];
+    if (!cur) continue;
+    const add: Partial<Exercise> = {};
+    for (const k of keys) if (cur[k] === undefined && d[k] !== undefined) (add as Record<string, unknown>)[k] = d[k];
+    if (Object.keys(add).length) out.push({ ...cur, ...add });
+  }
+  return out;
+};

@@ -2,7 +2,7 @@
 import { useSyncExternalStore } from 'react';
 import type { IDBPDatabase } from 'idb';
 import type { Db, ISODate, Patch } from '../domain/types';
-import { DEFAULT_EXERCISES, defaultProgramVersion, emptyDb } from '../domain/defaults';
+import { DEFAULT_EXERCISES, defaultProgramVersion, emptyDb, exerciseDefaultsPatch } from '../domain/defaults';
 import { applyPatch, Ctx, UseCaseError } from '../application/ctx';
 import { ensureWeeks } from '../application/plan';
 import { migrateFormula } from '../application/learning';
@@ -70,6 +70,9 @@ export const initApp = async () => {
     db = await loadAll(idb);
     // 첫 실행: 기본 운동과 V1.9 프리셋을 넣는다
     if (!Object.keys(db.exercises).length) { await commitPatch(idb, seed); db = applyPatch(db, seed); }
+    // 새 버전의 운동 기본 속성(최초 중량 환산 기준 등)을 예전 목록에 채운다
+    const exFill = exerciseDefaultsPatch(db.exercises);
+    if (exFill.length) { const pt: Patch = { put: { exercises: exFill } }; await commitPatch(idb, pt); db = applyPatch(db, pt); }
     // 계산식이 바뀐 버전으로 처음 열면 계수 관측을 새 공식으로 다시 계산(수행 기록은 그대로)
     const mig = migrateFormula(db, makeCtx());
     if (mig) { await commitPatch(idb, mig); db = applyPatch(db, mig); }

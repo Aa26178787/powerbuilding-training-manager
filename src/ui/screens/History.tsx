@@ -53,8 +53,8 @@ export const HistoryScreen = () => {
                 <div className="num mb-1 text-sm font-bold">{fmtDateKo(date)} <span className="font-normal text-dust">{date.slice(0, 4)}</span></div>
                 <ul className="space-y-0.5">
                   {[...sets].reverse().map((p) => (
-                    <li key={p.id} className="num flex min-h-[40px] items-center justify-between gap-2 text-sm">
-                      <button type="button" className={`press min-h-[40px] flex-1 text-left ${p.deleted ? 'text-dust line-through' : ''}`} onClick={() => !p.deleted && open(p)}>
+                    <li key={p.id} className="num flex min-h-11 items-center justify-between gap-2 text-sm">
+                      <button type="button" className={`press min-h-11 flex-1 text-left ${p.deleted ? 'text-dust line-through' : ''}`} onClick={() => !p.deleted && open(p)}>
                         {p.side && p.side !== 'both' ? (p.side === 'L' ? '왼팔 ' : '오른팔 ') : ''}{p.weight === null ? '' : `${fmtKg(p.weight)}kg × `}{p.seconds ? `${p.seconds}초` : `${p.reps}회`}{p.rpe !== undefined ? ` @${p.rpe}` : ''}<span className="text-xs text-dust">{e1(p)}</span>
                       </button>
                       <span className="flex items-center gap-1">

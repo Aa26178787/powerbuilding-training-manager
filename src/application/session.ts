@@ -1,8 +1,9 @@
 // 세션·세트 기록 유스케이스. 실제 수행 기록은 원본 그대로 보존하고 수정·삭제는 이력을 남긴다.
-import type { AuditEvent, Db, ExerciseState, ISODate, IssueFlag, Patch, PerformedSet, PerformedType, PlannedSet, Recommendation, Session, Side, WorkoutClose } from '../domain/types';
+import type { AuditEvent, Db, ExerciseState, FirstSessionSummary, ProgressionDecisionFastTrack, ISODate, IssueFlag, Patch, PerformedSet, PerformedType, PlannedSet, Recommendation, Session, Side, WorkoutClose } from '../domain/types';
 import { decideProgression, PROGRESSION_VERSION } from '../engine/progression';
+import { fastTrackLoad, INITIAL_LOAD_VERSION } from '../engine/initialLoad';
 import { Ctx, applyPatch, fail, mergePatches } from './ctx';
-import { bodyweightFor, livePerformed, suggestForSet } from './recommend';
+import { bodyweightFor, livePerformed, modeOf, stepOf, suggestForSet } from './recommend';
 import { learnFromInstance } from './learning';
 
 export const activeSession = (db: Db): Session | null =>
@@ -37,6 +38,12 @@ export interface RecordInput {
   side?: Side | null;
   flags?: IssueFlag[];
   note?: string;
+  /** 밴드·어시스트 머신 보조 */
+  assist?: 'band' | 'machine';
+  /** 워밍업 보정으로 정한 시작 중량(엔진이 낸 원래 추천값을 기록에 남긴다) */
+  calibration?: { load: number | null; raw: number | null; method: string; confidence: 'record' | 'estimate' | 'none'; inputs: Record<string, unknown> };
+  /** 추천과 다른 중량을 쓴 사유(선택) */
+  editReason?: string;
 }
 
 const validateRecord = (db: Db, i: RecordInput) => {
@@ -84,19 +91,26 @@ export const recordSet = (db: Db, i: RecordInput, ctx: Ctx): Patch => {
   let rec: Recommendation | null = null;
   if (planned) {
     const sug = suggestForSet(db, planned, i.date);
-    if (sug.kind !== 'none') {
+    if (i.calibration) {
+      rec = {
+        id: `r-${ctx.newId()}`, kind: 'calibration', exerciseId: i.exerciseId, instanceId: planned.instanceId, plannedSetId: planned.id,
+        algorithmVersion: INITIAL_LOAD_VERSION, inputs: i.calibration.inputs, rawLoad: i.calibration.raw, roundedLoad: i.calibration.load,
+        acceptedLoad: i.weight, message: '워밍업 세트로 시작 중량 보정', createdAt: ctx.now, method: i.calibration.method, confidence: i.calibration.confidence,
+        editReason: i.editReason,
+      };
+    } else if (sug.kind !== 'none') {
       const d = (sug.detail ?? {}) as { raw?: number; formulaVersion?: string };
       rec = {
-        id: `r-${ctx.newId()}`, kind: sug.kind, exerciseId: i.exerciseId, instanceId: planned.instanceId, plannedSetId: planned.id,
-        algorithmVersion: d.formulaVersion ?? PROGRESSION_VERSION, inputs: sug.detail ?? {}, rawLoad: d.raw ?? sug.load, roundedLoad: sug.load,
-        acceptedLoad: i.weight, message: sug.message, createdAt: ctx.now,
+        id: `r-${ctx.newId()}`, kind: sug.kind as Recommendation['kind'], exerciseId: i.exerciseId, instanceId: planned.instanceId, plannedSetId: planned.id,
+        algorithmVersion: d.formulaVersion ?? PROGRESSION_VERSION, inputs: { ...(sug.detail ?? {}), basis: sug.basis }, rawLoad: sug.basis?.raw ?? d.raw ?? sug.load, roundedLoad: sug.load,
+        acceptedLoad: i.weight, message: sug.message, createdAt: ctx.now, method: sug.method, confidence: sug.confidence, editReason: i.editReason,
       };
     }
   }
   const perf: PerformedSet = {
     id: `p-${ctx.newId()}`, plannedSetId: planned?.id ?? null, instanceId: planned?.instanceId ?? i.instanceId ?? null, sessionId: session.id,
     exerciseId: i.exerciseId, type: i.type ?? planned?.type ?? 'extra', weight: i.weight, bodyweight: bw, reps: i.reps, seconds: i.seconds, rpe: i.rpe,
-    side, flags: i.flags ?? [], note: i.note?.slice(0, 500), performedAt: ctx.now, sessionDate: session.date, recommendationId: rec?.id, rev: 1,
+    side, flags: i.flags ?? [], note: i.note?.slice(0, 500), performedAt: ctx.now, sessionDate: session.date, recommendationId: rec?.id, ...(i.assist ? { assist: i.assist } : {}), rev: 1,
   };
   patches.push({ put: { performed: [perf], ...(nextPlanned ? { plannedSets: [nextPlanned] } : {}), ...(rec ? { recs: [rec] } : {}) } });
   let patch = mergePatches(...patches);
@@ -209,7 +223,7 @@ export const evaluateProgression = (db: Db, instanceId: string, ctx: Ctx): Patch
   const ex = db.exercises[inst.exerciseId];
   if (!ex || inst.model === 'arm_manual') return {};
   const sets = Object.values(db.plannedSets).filter((s) => s.instanceId === instanceId && s.status !== 'removed' && s.status !== 'excused').sort((a, b) => a.index - b.index);
-  const done = livePerformed(db, (p) => p.instanceId === instanceId && p.plannedSetId !== null && p.type !== 'warmup');
+  const done = livePerformed(db, (p) => p.instanceId === instanceId && p.plannedSetId !== null && p.type !== 'warmup' && !p.assist);
   if (!done.length) return {};
   const prev = db.exStates[ex.id];
   const g = inst.groups[0];
@@ -221,12 +235,35 @@ export const evaluateProgression = (db: Db, instanceId: string, ctx: Ctx): Patch
     prevFailStreak: baseStreak, dpCriterion: inst.dpCriterion,
     bodyweight: ex.loadMode === 'bodyweight_plus' ? (done[0].bodyweight ?? db.settings.bodyweight ?? undefined) : undefined,
   });
+  // Fast-track: Top Set이 목표 RPE보다 가볍게 끝났고 증량 판정이면, 그 기록에서 목표 RPE 중량을 역산(선형 증량과 중복하지 않음, 상한 적용)
+  let fastTrack: ProgressionDecisionFastTrack | undefined;
+  let nextLoad = r.nextLoad;
+  let reason = r.reason;
+  const top = done.find((p) => p.type === 'top');
+  const topSpec = inst.groups.find((x) => x.type === 'top');
+  if (inst.model === 'top_backoff' && r.action === 'increase' && top && top.weight !== null && top.reps !== undefined && top.rpe !== undefined && topSpec?.targetRpe !== undefined) {
+    const bw = ex.loadMode === 'bodyweight_plus' ? (top.bodyweight ?? db.settings.bodyweight ?? 0) : 0;
+    const ft = fastTrackLoad({ sourceId: top.id, lastLoad: top.weight, reps: top.reps, rpe: top.rpe, targetRpe: topSpec.targetRpe, k: prev?.k ?? 1, bodyweight: bw,
+      increment: ex.increment, step: stepOf(db, ex), maxPct: db.settings.fastTrackMaxPct ?? 0.05, rounding: modeOf(db, ex, 'fast_track') });
+    fastTrack = { applied: ft.applied, sourceId: ft.sourceId, base: ft.base, rtsLoad: ft.rtsLoad, cap: ft.cap, raw: ft.raw, rounded: ft.rounded, rounding: modeOf(db, ex, 'fast_track'), step: stepOf(db, ex) };
+    if (ft.applied) { nextLoad = ft.rounded; reason = `${r.reason.replace(/\. 다음 세션 \+[\d.]+kg 제안$/, '')}. Top Set이 @${top.rpe}로 목표 @${topSpec.targetRpe}보다 가벼워 Fast-track ${ft.rounded}kg 제안(기본 증량 ${ft.base}kg, 상한 ${Math.round((ft.cap ?? 0) * 100) / 100}kg)`; }
+  }
   // 유효 관측이 있으면 개인화 계수 갱신(관측 이전 계수로 예측을 평가한 뒤 학습 — 누수 없음)
   const learned = learnFromInstance(db, instanceId, ctx);
+  // 첫 세션 요약: 이 운동의 첫 판정이거나 같은 첫 처방을 다시 판정할 때만 쓴다
+  const firstRec = done[0].recommendationId ? db.recs[done[0].recommendationId] : undefined;
+  const isFirst = !prev?.firstSession || prev.firstSession.date === done[0].sessionDate;
+  const firstSession: FirstSessionSummary | undefined = isFirst ? {
+    date: done[0].sessionDate, recommendedLoad: firstRec?.roundedLoad ?? null, method: firstRec?.method ?? (firstRec ? firstRec.kind : 'manual'),
+    confidence: firstRec?.confidence ?? 'none', baseExerciseId: ex.variationOf?.compExerciseId ?? ex.relatedOf?.exerciseId,
+    kBase: ex.variationOf?.kBase ?? ex.relatedOf?.kBase, kIndividual: prev?.k ?? 1, actualLoad: done[0].weight,
+    modified: !!firstRec && firstRec.roundedLoad !== null && done[0].weight !== firstRec.roundedLoad,
+    sets: done.map((p) => ({ weight: p.weight, reps: p.reps, seconds: p.seconds, rpe: p.rpe })), nextLoad: nextLoad ?? null, action: r.action,
+  } : prev?.firstSession;
   const state: ExerciseState = {
-    exerciseId: ex.id, k: learned.k ?? prev?.k ?? 1, seed: prev?.seed,
-    nextLoad: r.nextLoad ?? prev?.nextLoad ?? null, failStreak: r.failStreak,
-    lastDecision: { action: r.action, nextLoad: r.nextLoad, failStreak: r.failStreak, reason: r.reason, reduceOptions: r.reduceOptions, decidedAt: ctx.now, instanceId, prevFailStreak: baseStreak },
+    exerciseId: ex.id, k: learned.k ?? prev?.k ?? 1, seed: prev?.seed, equipment: prev?.equipment, firstSession,
+    nextLoad: nextLoad ?? prev?.nextLoad ?? null, failStreak: r.failStreak,
+    lastDecision: { action: r.action, nextLoad, failStreak: r.failStreak, reason, reduceOptions: r.reduceOptions, decidedAt: ctx.now, instanceId, prevFailStreak: baseStreak, fastTrack },
     updatedAt: ctx.now,
   };
   return mergePatches(learned.patch, { put: { exStates: [state] } });
@@ -237,7 +274,7 @@ export const setNextLoad = (db: Db, exerciseId: string, load: number | null, not
   if (!db.exercises[exerciseId]) fail('운동을 찾을 수 없습니다');
   if (load !== null && (!Number.isFinite(load) || load < 0 || load > 1000)) fail('중량 값을 확인하세요');
   const prev = db.exStates[exerciseId];
-  const next: ExerciseState = { exerciseId, k: prev?.k ?? 1, seed: prev?.seed, lastDecision: prev?.lastDecision, failStreak: 0, nextLoad: load, updatedAt: ctx.now };
+  const next: ExerciseState = { ...prev, exerciseId, k: prev?.k ?? 1, failStreak: 0, nextLoad: load, updatedAt: ctx.now };
   return { put: { exStates: [next], audit: [audit(ctx, 'exState', exerciseId, 'update', prev ?? null, { ...next, note })] } };
 };
 
@@ -245,7 +282,16 @@ export const setSeed = (db: Db, exerciseId: string, seed: ExerciseState['seed'] 
   if (!db.exercises[exerciseId]) fail('운동을 찾을 수 없습니다');
   if (seed && (!(seed.weight >= 0) || !(seed.reps >= 1 && seed.reps <= 30) || !(seed.rpe >= 5 && seed.rpe <= 10))) fail('기준 기록 값을 확인하세요');
   const prev = db.exStates[exerciseId];
-  return { put: { exStates: [{ exerciseId, k: prev?.k ?? 1, nextLoad: prev?.nextLoad ?? null, failStreak: prev?.failStreak ?? 0, lastDecision: prev?.lastDecision, seed, updatedAt: ctx.now }] } };
+  return { put: { exStates: [{ ...prev, exerciseId, k: prev?.k ?? 1, nextLoad: prev?.nextLoad ?? null, failStreak: prev?.failStreak ?? 0, seed, updatedAt: ctx.now }] } };
+};
+
+/** 장비 정보(기구 번호·단위·핀 간격·메모). 중량 계산에는 쓰지 않고 기록 해석용으로 남긴다 */
+export const setEquipment = (db: Db, exerciseId: string, equipment: ExerciseState['equipment'] | undefined, ctx: Ctx): Patch => {
+  if (!db.exercises[exerciseId]) fail('운동을 찾을 수 없습니다');
+  if (equipment?.pinStep !== undefined && !(equipment.pinStep > 0 && equipment.pinStep <= 50)) fail('핀 간격을 확인하세요');
+  const prev = db.exStates[exerciseId];
+  const clean = equipment ? { ...equipment, id: equipment.id?.slice(0, 40), note: equipment.note?.slice(0, 200) } : undefined;
+  return { put: { exStates: [{ ...prev, exerciseId, k: prev?.k ?? 1, nextLoad: prev?.nextLoad ?? null, failStreak: prev?.failStreak ?? 0, equipment: clean, updatedAt: ctx.now }] } };
 };
 
 export interface SessionReport {

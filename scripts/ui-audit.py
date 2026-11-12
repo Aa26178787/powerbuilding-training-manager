@@ -12,7 +12,7 @@ JS = r"""
   const blend = (top, bot) => ({ r: top.r * top.a + bot.r * (1 - top.a), g: top.g * top.a + bot.g * (1 - top.a), b: top.b * top.a + bot.b * (1 - top.a), a: 1 });
   const bgOf = (el) => { const stack = []; let e = el; while (e) { const c = parse(getComputedStyle(e).backgroundColor); if (c && c.a > 0) stack.push(c); if (c && c.a >= 1) break; e = e.parentElement; } let bg = { r: 255, g: 255, b: 255, a: 1 }; if (!stack.length || stack[stack.length - 1].a < 1) bg = parse(getComputedStyle(document.body).backgroundColor) || bg; for (let i = stack.length - 1; i >= 0; i--) bg = blend(stack[i], bg); return bg; };
   const visible = (el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && r.bottom > 0 && r.top < innerHeight * 3; };
-  const name = (el) => (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || el.getAttribute('placeholder') || '').trim().slice(0, 30);
+  const name = (el) => ((el.tagName === 'LABEL' && el.querySelector('input')?.getAttribute('aria-label')) || el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || el.getAttribute('placeholder') || '').trim().slice(0, 30);
   // 대비: 글자를 직접 가진 요소
   for (const el of document.querySelectorAll('body *')) {
     if (!visible(el) || el.closest('[aria-hidden=true]')) continue;
@@ -34,7 +34,9 @@ JS = r"""
     const r = el.getBoundingClientRect();
     // after 가상요소로 넓힌 영역은 인정
     const after = getComputedStyle(el, '::after'); const ext = after.content !== 'none' && after.position === 'absolute';
-    if ((r.width < 44 || r.height < 44) && !ext) out.small.push({ name: name(el), w: Math.round(r.width), h: Math.round(r.height) });
+    // 9칸 RPE 줄처럼 촘촘한 선택지는 높이 44px, 너비 36px 이상이면 인정(WCAG 2.5.8 AA는 24px)
+    const dense = el.closest('[data-dense]') && r.height >= 44 && r.width >= 36;
+    if ((r.width < 44 || r.height < 44) && !ext && !dense) out.small.push({ name: name(el), w: Math.round(r.width), h: Math.round(r.height) });
     if (!name(el) && !el.querySelector('img[alt]')) out.noname.push(el.outerHTML.slice(0, 80));
   }
   // 잘림: 말줄임 없이 넘치는 글자
