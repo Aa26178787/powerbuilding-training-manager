@@ -64,7 +64,7 @@ export const latestE1rm = (db: Db, exerciseId: string): number | null => {
   return calculateConservativeE1RM(src.weight + bw, src.reps, src.rpe);
 };
 
-/** 사용 가능한 중량 단위: 운동 설정(loadStep, 없으면 증량 단위). 원판을 끼우는 운동(바벨·스미스·플레이트 머신)은 가진 원판으로 만들 수 있는 최소 간격보다 작을 수 없다 */
+/** 사용 가능한 중량 단위: 운동 설정(loadStep, 없으면 증량 단위). 바벨은 가진 원판으로 만들 수 있는 최소 간격보다 작을 수 없다 */
 export const stepOf = (db: Db, ex: Exercise): number =>
   Math.max(ex.loadStep ?? ex.increment, plateSetup(ex, db.settings) ? minBarbellStep(db.settings.plates, db.settings.plateStock) : 0);
 /** 반올림 방식: 운동별 지정 > 설정의 종류별 정책 > 기본표 */

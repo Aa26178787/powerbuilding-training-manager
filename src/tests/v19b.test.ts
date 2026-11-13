@@ -284,21 +284,21 @@ describe('마이그레이션', () => {
 });
 
 describe('원판 계산 적용 범위', () => {
-  it('모든 바벨 운동은 설정의 바 무게로, 스미스·플레이트 머신은 기구 무게(기본 0)로 원판을 계산', () => {
+  it('바벨 운동만 원판 계산(설정의 바 무게), 스미스·플레이트 머신·케이블은 제외', () => {
     const db = makeDb();
     const bars = DEFAULT_EXERCISES.filter((e) => e.equipment === 'barbell');
     expect(bars.map((e) => e.id).sort()).toEqual(['comp_bench', 'comp_squat', 'comp_sumo', 'conv_dl', 'decline_press', 'highbar_squat', 'larsen_bench', 'paused_conv', 'rdl', 'sng_bench']);
     for (const e of bars) expect(plateSetup(e, db.settings)).toEqual({ base: 20 });
-    expect(plateSetup(db.exercises.incline_smith, db.settings)).toEqual({ base: 0 });
-    expect(plateSetup(db.exercises.linear_row, db.settings)).toEqual({ base: 0 });
+    expect(plateSetup(db.exercises.incline_smith, db.settings)).toBeNull();
+    expect(plateSetup(db.exercises.linear_row, db.settings)).toBeNull();
     expect(plateSetup(db.exercises.cable_lateral, db.settings)).toBeNull();
     expect(plateBreakdown(60, 0, db.settings.plates)?.perSide).toEqual([25, 5]);
   });
-  it('플레이트 머신도 가진 원판으로 만들 수 없는 단위는 추천하지 않음', () => {
+  it('원판 보유량에 따른 단위 제한은 바벨에만', () => {
     let db = makeDb();
     db = { ...db, settings: { ...db.settings, plateStock: [{ kg: 20, pairs: null }, { kg: 5, pairs: null }] } };
-    expect(stepOf(db, db.exercises.linear_row)).toBe(10);
-    expect(stepOf(db, db.exercises.leg_ext)).toBe(2.5);
+    expect(stepOf(db, db.exercises.rdl)).toBe(10);
+    expect(stepOf(db, db.exercises.linear_row)).toBe(2.5);
   });
   it('라이브러리에서 장비를 바벨로 바꾸면 원판 계산 대상이 되고, 바 무게를 따로 정할 수 있다', () => {
     let db = makeDb();

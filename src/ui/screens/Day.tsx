@@ -402,7 +402,6 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
               <div className="mt-1 text-center text-[12px] text-dust">
                 한쪽 <span className="num-d text-[14px] text-chalk/80">{plates.perSide.join(' ') || '빈 바'}</span>
                 {plates.remainder > 0 && <span className="text-p25">, 가진 원판으로 {plates.remainder}kg 모자람</span>}
-                {g.exercise.equipment && g.exercise.equipment !== 'barbell' && !g.exercise.barbell && <span>, 기구 무게 {setup!.base}kg 기준</span>}
               </div>
             </>
           )}

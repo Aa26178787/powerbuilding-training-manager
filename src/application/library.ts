@@ -15,7 +15,7 @@ export interface ExerciseDraft {
   primaryMuscles: string[];
   secondaryMuscles: string[];
   unilateral: boolean;
-  /** 원판을 끼우는 운동의 바·기구 무게. 비우면 바벨은 설정값, 스미스·플레이트 머신은 0 */
+  /** 바벨 운동의 바 무게. 비우면 설정값 */
   barWeight?: number;
   pause?: { position: string; seconds: number };
 }
@@ -58,7 +58,7 @@ export const saveExercise = (db: Db, d: ExerciseDraft, ctx: Ctx): Patch => {
     unilateral: d.unilateral || undefined,
     // 원판 계산: 장비 유형이 바벨이면 바벨로 다룬다(고정 운동은 그대로)
     barbell: prev?.fixed ? base.barbell : d.equipment === 'barbell',
-    barWeight: ['barbell', 'smith', 'plate_loaded'].includes(d.equipment) ? d.barWeight : undefined,
+    barWeight: d.equipment === 'barbell' ? d.barWeight : undefined,
     loadUnit: base.loadUnit ?? (d.equipment === 'dumbbell' ? 'per_hand' : d.equipment === 'machine' || d.equipment === 'cable' ? 'machine' : undefined),
     ...(d.pause ? { pause: { position: d.pause.position.trim().slice(0, 80), seconds: d.pause.seconds } } : {}),
   };
