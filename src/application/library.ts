@@ -15,6 +15,8 @@ export interface ExerciseDraft {
   primaryMuscles: string[];
   secondaryMuscles: string[];
   unilateral: boolean;
+  /** 원판을 끼우는 운동의 바·기구 무게. 비우면 바벨은 설정값, 스미스·플레이트 머신은 0 */
+  barWeight?: number;
   pause?: { position: string; seconds: number };
 }
 
@@ -39,6 +41,7 @@ export const saveExercise = (db: Db, d: ExerciseDraft, ctx: Ctx): Patch => {
   if (d.repRange && !(d.repRange[0] >= 1 && d.repRange[1] >= d.repRange[0] && d.repRange[1] <= 50)) fail('반복수 범위를 확인하세요');
   if (![...d.primaryMuscles, ...d.secondaryMuscles].every((m) => MUSCLE_IDS.has(m))) fail('알 수 없는 근육입니다');
   if (!d.primaryMuscles.length) fail('주요 근육군을 하나 이상 고르세요');
+  if (d.barWeight !== undefined && !(d.barWeight >= 0 && d.barWeight <= 100)) fail('바·기구 무게를 확인하세요');
   if (d.pause && !(d.pause.seconds >= 0 && d.pause.seconds <= 10)) fail('정지 시간을 확인하세요');
   const dup = Object.values(db.exercises).find((e) => e.id !== d.id && !e.archived && e.name.toLowerCase() === name.toLowerCase());
   if (dup) fail('같은 이름의 운동이 있습니다');
@@ -53,6 +56,9 @@ export const saveExercise = (db: Db, d: ExerciseDraft, ctx: Ctx): Patch => {
     ...base, name, category: d.category, slotIds, equipment: d.equipment, increment: d.increment,
     loadStep: d.loadStep, repRange: d.repRange, primaryMuscles: d.primaryMuscles, secondaryMuscles: d.secondaryMuscles.filter((m) => !d.primaryMuscles.includes(m)),
     unilateral: d.unilateral || undefined,
+    // 원판 계산: 장비 유형이 바벨이면 바벨로 다룬다(고정 운동은 그대로)
+    barbell: prev?.fixed ? base.barbell : d.equipment === 'barbell',
+    barWeight: ['barbell', 'smith', 'plate_loaded'].includes(d.equipment) ? d.barWeight : undefined,
     loadUnit: base.loadUnit ?? (d.equipment === 'dumbbell' ? 'per_hand' : d.equipment === 'machine' || d.equipment === 'cable' ? 'machine' : undefined),
     ...(d.pause ? { pause: { position: d.pause.position.trim().slice(0, 80), seconds: d.pause.seconds } } : {}),
   };

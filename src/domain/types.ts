@@ -32,6 +32,8 @@ export interface Exercise {
   /** bodyweight_plus: 체중 + 추가 중량(딥스·풀업). weight 필드는 추가 중량만 저장 */
   loadMode: 'external' | 'bodyweight_plus';
   barbell: boolean;
+  /** 원판을 끼우는 운동의 바·기구 자체 무게(kg). 바벨은 비우면 설정의 바 무게, 스미스·플레이트 머신은 비우면 0 */
+  barWeight?: number;
   /** Variation 시작 중량 산출 기준(Comp 종목과 기본 계수) */
   variationOf?: { compExerciseId: string; kBase: number };
   /** 같은 동작의 다른 처방(예: 딥스 Volume ← 딥스 Strength). 자기 기록이 없을 때만 임시 추정에 쓴다 */

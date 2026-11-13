@@ -11,7 +11,10 @@ import { periodAchievement } from '../application/selectors';
 import { conservativeE1RM, loadForTarget } from '../engine/e1rm';
 import { roundLoad } from '../engine/rounding';
 import { DEFAULT_DAYS, DEFAULT_EXERCISES, emptyDb } from '../domain/defaults';
-import { muscleName } from '../domain/slots';
+import { muscleName, plateSetup } from '../domain/slots';
+import { stepOf } from '../application/recommend';
+import { saveExercise } from '../application/library';
+import { plateBreakdown } from '../engine/rounding';
 import { applyPatch } from '../application/ctx';
 import { makeCtx, makeDb, run, START } from './helpers';
 
@@ -277,5 +280,34 @@ describe('마이그레이션', () => {
     const sets = (slot: string) => DEFAULT_DAYS.flatMap((d) => d.items).filter((i) => i.slotId === slot).reduce((n, i) => n + i.groups[0].count, 0);
     expect(['upper_chest', 'horizontal_pull', 'lateral_delt', 'posterior_delt', 'triceps', 'knee_extension', 'knee_flexion', 'abs'].map(sets)).toEqual([2, 9, 7, 3, 2, 3, 5, 6]);
     expect(sets('hip_hinge')).toBe(0); // RDL은 고정 운동(패턴 분류만 Hip Hinge)
+  });
+});
+
+describe('원판 계산 적용 범위', () => {
+  it('모든 바벨 운동은 설정의 바 무게로, 스미스·플레이트 머신은 기구 무게(기본 0)로 원판을 계산', () => {
+    const db = makeDb();
+    const bars = DEFAULT_EXERCISES.filter((e) => e.equipment === 'barbell');
+    expect(bars.map((e) => e.id).sort()).toEqual(['comp_bench', 'comp_squat', 'comp_sumo', 'conv_dl', 'decline_press', 'highbar_squat', 'larsen_bench', 'paused_conv', 'rdl', 'sng_bench']);
+    for (const e of bars) expect(plateSetup(e, db.settings)).toEqual({ base: 20 });
+    expect(plateSetup(db.exercises.incline_smith, db.settings)).toEqual({ base: 0 });
+    expect(plateSetup(db.exercises.linear_row, db.settings)).toEqual({ base: 0 });
+    expect(plateSetup(db.exercises.cable_lateral, db.settings)).toBeNull();
+    expect(plateBreakdown(60, 0, db.settings.plates)?.perSide).toEqual([25, 5]);
+  });
+  it('플레이트 머신도 가진 원판으로 만들 수 없는 단위는 추천하지 않음', () => {
+    let db = makeDb();
+    db = { ...db, settings: { ...db.settings, plateStock: [{ kg: 20, pairs: null }, { kg: 5, pairs: null }] } };
+    expect(stepOf(db, db.exercises.linear_row)).toBe(10);
+    expect(stepOf(db, db.exercises.leg_ext)).toBe(2.5);
+  });
+  it('라이브러리에서 장비를 바벨로 바꾸면 원판 계산 대상이 되고, 바 무게를 따로 정할 수 있다', () => {
+    let db = makeDb();
+    const base = { name: 'Close-grip Bench', category: 'arms', slotId: 'triceps', equipment: 'barbell' as const, increment: 2.5, primaryMuscles: ['triceps'], secondaryMuscles: ['chest'], unilateral: false };
+    db = run(db, saveExercise(db, { ...base, barWeight: 15 }, makeCtx()));
+    const ex = Object.values(db.exercises).find((e) => e.name === 'Close-grip Bench')!;
+    expect(ex.barbell).toBe(true);
+    expect(plateSetup(ex, db.settings)).toEqual({ base: 15 });
+    db = run(db, saveExercise(db, { ...base, id: ex.id, equipment: 'cable', barWeight: undefined }, makeCtx()));
+    expect(plateSetup(db.exercises[ex.id], db.settings)).toBeNull();
   });
 });

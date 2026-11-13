@@ -84,3 +84,10 @@ export const movementOf = (ex: Exercise | undefined, slotId?: string): string =>
 export const EQUIPMENT_NAMES: Record<string, string> = {
   barbell: 'Barbell', dumbbell: 'Dumbbell', machine: 'Machine', plate_loaded: 'Plate-loaded', cable: 'Cable', smith: 'Smith', bodyweight: 'Bodyweight', other: 'Other',
 };
+
+/** 원판을 끼우는 운동이면 원판 계산 기준 무게. 바벨·스미스·플레이트 머신 모두 해당, 아니면 null */
+export const plateSetup = (ex: Exercise, settings: Pick<Db['settings'], 'barWeight'>): { base: number } | null => {
+  const isBar = ex.barbell || ex.equipment === 'barbell';
+  if (!isBar && ex.equipment !== 'smith' && ex.equipment !== 'plate_loaded') return null;
+  return { base: ex.barWeight ?? (isBar ? settings.barWeight : 0) };
+};

@@ -17,7 +17,7 @@ const draftOf = (db: Db, e?: Exercise, slotId?: string): ExerciseDraft => {
     equipment: e?.equipment ?? 'machine', increment: e?.increment ?? 2.5, loadStep: e?.loadStep, repRange: e?.repRange,
     primaryMuscles: e?.primaryMuscles ?? Object.entries(w).filter(([, v]) => v >= 1).map(([m]) => m),
     secondaryMuscles: e?.secondaryMuscles ?? Object.entries(w).filter(([, v]) => v < 1).map(([m]) => m),
-    unilateral: !!e?.unilateral, pause: e?.pause,
+    unilateral: !!e?.unilateral, barWeight: e?.barWeight, pause: e?.pause,
   };
 };
 
@@ -73,6 +73,12 @@ const ExerciseForm = ({ db, init, onClose }: { db: Db; init: ExerciseDraft; onCl
           <label className="text-[12px] text-dust">최대 회<input className="field num mt-1" type="number" inputMode="numeric" value={d.repRange?.[1] ?? ''} onChange={(e) => { const b = num(e.target.value); setD({ ...d, repRange: b === undefined ? undefined : [d.repRange?.[0] ?? b, b] }); }} /></label>
         </div>
       </div>
+      {['barbell', 'smith', 'plate_loaded'].includes(d.equipment) && (
+        <label className="mt-3 block text-[12px] text-dust">{d.equipment === 'barbell' ? '바 무게' : '기구 자체 무게(기록에 포함할 때만)'} kg
+          <input className="field num mt-1" type="number" inputMode="decimal" step="any" placeholder={d.equipment === 'barbell' ? `설정값 ${db.settings.barWeight}kg` : '0'} value={d.barWeight ?? ''} onChange={(e) => setD({ ...d, barWeight: num(e.target.value) })} />
+          <span className="mt-1 block">원판 그림과 추천 중량 단위를 이 무게와 가진 원판으로 계산합니다.</span>
+        </label>
+      )}
       <label className="mt-3 flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5 accent-[var(--color-p15)]" checked={d.unilateral} onChange={(e) => setD({ ...d, unilateral: e.target.checked })} />좌·우 한쪽씩 하는 운동</label>
       <MuscleChips label="주요 근육군(가중치 1.0)" value={d.primaryMuscles} other={d.secondaryMuscles} onChange={(v) => setD({ ...d, primaryMuscles: v })} />
       <MuscleChips label="보조 근육군(가중치 0.5)" value={d.secondaryMuscles} other={d.primaryMuscles} onChange={(v) => setD({ ...d, secondaryMuscles: v })} />

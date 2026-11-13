@@ -16,7 +16,7 @@ import {
 } from '../../application/session';
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
 import { assignSlot, duplicateWarnings, slotOptions, swapInstanceExercise } from '../../application/slots';
-import { EQUIPMENT_NAMES, slotById } from '../../domain/slots';
+import { EQUIPMENT_NAMES, plateSetup, slotById } from '../../domain/slots';
 import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
 import { Badge, Btn, Chip, cx, fmtKg, PLATE_COLOR, Reveal, RpePicker, Sheet, Stepper } from '../components';
@@ -332,7 +332,8 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id, sug?.load, g.exercise.id]);
   const w = weight === '' ? null : Number(weight);
-  const plates = g.exercise.barbell && w !== null && w > 0 ? plateBreakdown(w, db.settings.barWeight, db.settings.plates, db.settings.plateStock) : null;
+  const setup = plateSetup(g.exercise, db.settings);
+  const plates = setup && w !== null && w > 0 ? plateBreakdown(w, setup.base, db.settings.plates, db.settings.plateStock) : null;
   const open = g.sets.filter((s) => s.status === 'planned');
   const bumpW = (d: number) => setWeight(String(Math.max(0, Math.round(((Number(weight) || 0) + d) * 1000) / 1000)));
   const recLoad = calib ? calib.load : sug?.load ?? null;
@@ -372,6 +373,7 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
               <div className="mt-1 text-center text-[12px] text-dust">
                 한쪽 <span className="num-d text-[14px] text-chalk/80">{plates.perSide.join(' ') || '빈 바'}</span>
                 {plates.remainder > 0 && <span className="text-p25">, 가진 원판으로 {plates.remainder}kg 모자람</span>}
+                {g.exercise.equipment && g.exercise.equipment !== 'barbell' && !g.exercise.barbell && <span>, 기구 무게 {setup!.base}kg 기준</span>}
               </div>
             </>
           )}
