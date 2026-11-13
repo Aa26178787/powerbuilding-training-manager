@@ -170,6 +170,31 @@ const Advice = ({ sug, onStop, openCount, disabled }: { sug: Suggestion; onStop:
 
 const Tag = ({ children }: { children: ReactNode }) => <span className="inline-flex h-6 items-center rounded-md border border-rail px-2 text-[11.5px] text-dust">{children}</span>;
 
+/** 딥스 벨트: 허리 벨트에서 체인이 내려와 원판을 한 핀에 건다(옆모습). 원판은 짝 없이 한 묶음 */
+const BeltDiagram = ({ stack }: { stack: number[] }) => {
+  const plates = stack.map((kg, i) => ({ kg, i, w: PLATE_DIM[String(kg)]?.[0] ?? 4, h: PLATE_DIM[String(kg)]?.[1] ?? 26 }));
+  return (
+    <div aria-hidden className="relative mx-auto h-[164px] w-[200px]">
+      <svg className="absolute inset-x-0 top-0" width="200" height="74" viewBox="0 0 200 74" fill="none">
+        <path d="M24 8 Q100 34 176 8" stroke="#8a8f98" strokeWidth="9" strokeLinecap="round" />
+        <path d="M30 14 L100 58 M170 14 L100 58" stroke="#a3a8b0" strokeWidth="2.5" strokeDasharray="4 3" />
+        <circle cx="100" cy="62" r="5" stroke="#a3a8b0" strokeWidth="2.5" />
+        <path d="M100 67 L100 72" stroke="#a3a8b0" strokeWidth="2.5" />
+      </svg>
+      {/* 핀에 원판을 걸어 아래로 늘어뜨린 옆모습: 원판 윗부분을 핀 높이에 맞춘다 */}
+      <div className="absolute left-1/2 top-[72px] flex -translate-x-1/2 flex-col items-center">
+        <div className="h-[5px] rounded-sm bg-[#8a8f98]" style={{ width: plates.reduce((n, p) => n + p.w + 2, 0) + 14 }} />
+        <div className="-mt-[2px] flex items-start gap-[2px]">
+          {plates.map((p) => (
+            <m.span key={`${p.i}-${p.kg}`} className="block origin-top rounded-[3px]" initial={{ opacity: 0, scaleY: 0.6 }} animate={{ opacity: 1, scaleY: 1 }} transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+              style={{ width: p.w, height: p.h, background: PLATE_COLOR[String(p.kg)] ?? '#6b7280', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14)' }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /** 원판 지름(mm)·두께 비율로 그린 크기 [폭, 높이] px. 25·20kg 지름 450mm를 88px로 */
 const PLATE_DIM: Record<string, [number, number]> = { 25: [11, 88], 20: [10, 88], 15: [9, 78], 10: [8, 64], 5: [6, 45], 2.5: [5, 37], 1.25: [4, 31] };
 
@@ -334,6 +359,10 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
   const w = weight === '' ? null : Number(weight);
   const setup = plateSetup(g.exercise, db.settings);
   const plates = setup && w !== null && w > 0 ? plateBreakdown(w, setup.base, db.settings.plates, db.settings.plateStock) : null;
+  // 중량 딥스·풀업: 벨트에 다는 원판(짝 없이). 가진 수량은 짝 수 × 2장
+  const belt = !setup && g.exercise.loadMode === 'bodyweight_plus' && !assist && w !== null && w > 0
+    ? plateBreakdown(w * 2, 0, db.settings.plates, db.settings.plateStock?.map((x) => ({ kg: x.kg, pairs: x.pairs === null ? null : x.pairs * 2 })))
+    : null;
   const open = g.sets.filter((s) => s.status === 'planned');
   const bumpW = (d: number) => setWeight(String(Math.max(0, Math.round(((Number(weight) || 0) + d) * 1000) / 1000)));
   const recLoad = calib ? calib.load : sug?.load ?? null;
@@ -377,7 +406,16 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
               </div>
             </>
           )}
-          {g.exercise.loadMode === 'bodyweight_plus' && <div className="text-center text-[12px] text-dust">{assist ? `보조(${assist === 'band' ? '밴드' : '머신'}) 사용, 중량은 0으로` : '추가 중량(벨트에 다는 무게)'}</div>}
+          {belt && (
+            <>
+              <BeltDiagram stack={belt.perSide} />
+              <div className="mt-1 text-center text-[12px] text-dust">
+                벨트에 거는 원판 <span className="num-d text-[14px] text-chalk/80">{belt.perSide.join(' ') || '없음'}</span>
+                {belt.remainder > 0 && <span className="text-p25">, 가진 원판으로 {belt.remainder / 2}kg 모자람</span>}
+              </div>
+            </>
+          )}
+          {g.exercise.loadMode === 'bodyweight_plus' && !belt && <div className="text-center text-[12px] text-dust">{assist ? `보조(${assist === 'band' ? '밴드' : '머신'}) 사용, 중량은 0으로` : '추가 중량(벨트에 다는 무게)'}</div>}
           {unitLbl && <div className="text-center text-[12px] text-dust">{unitLbl} 기준</div>}
           <div className="mt-2.5"><BigNumber value={weight} onChange={setWeight} onStep={bumpW} step={inc} unit="kg" label={`${labelOf(active)} 중량`} disabled={disabled} /></div>
           <div className="mx-auto mt-1 max-w-[220px]"><BigNumber value={reps} onChange={setReps} onStep={bumpR} step={1} unit={unit} label={`${labelOf(active)} ${active.seconds ? '유지 시간' : '반복수'}`} size="md" disabled={disabled} /></div>
