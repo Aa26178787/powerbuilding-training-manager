@@ -29,10 +29,23 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('ptm-shell-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 const FONTS = 'ptm-fonts';
-// 같은 출처의 GET만 처리: 캐시 우선, 없으면 네트워크. 훈련 데이터는 여기 저장하지 않는다(IndexedDB 전용).
+// 화면(HTML)은 네트워크 우선: 배포 직후 옛 HTML이 지워진 옛 JS를 가리켜 빈 화면이 되는 일을 막는다.
+// 3초 안에 응답이 없거나 오프라인이면 캐시한 화면을 쓴다.
+const fromNetwork = (req) => new Promise((resolve, reject) => {
+  const t = setTimeout(() => reject(new Error('timeout')), 3000);
+  fetch(req).then((res) => { clearTimeout(t); res.ok ? resolve(res) : reject(new Error(String(res.status))); }, (err) => { clearTimeout(t); reject(err); });
+});
+// 같은 출처의 GET만 처리. 훈련 데이터는 여기 저장하지 않는다(IndexedDB 전용).
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fromNetwork(e.request).then((res) => {
+      const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./', copy)).catch(() => undefined);
+      return res;
+    }).catch(() => caches.match('./', { cacheName: CACHE }).then((hit) => hit || caches.match('./')).then((hit) => hit || fetch(e.request))));
+    return;
+  }
   if (url.pathname.endsWith('.woff2')) {
     // 서체 파일은 이름에 해시가 있어 바뀌지 않으므로, 한 번 받으면 보관해 두고 오프라인에서도 쓴다
     e.respondWith(caches.match(e.request, { ignoreVary: true }).then((hit) => hit || fetch(e.request).then((res) => {
@@ -41,7 +54,8 @@ self.addEventListener('fetch', (e) => {
     })));
     return;
   }
-  e.respondWith(caches.match(e.request, { ignoreSearch: true, ignoreVary: true }).then((hit) => hit || fetch(e.request).catch(() => (e.request.mode === 'navigate' ? caches.match('./') : Response.error()))));
+  // 나머지(이름에 해시가 있는 JS·CSS·아이콘)는 캐시 우선, 없으면 네트워크
+  e.respondWith(caches.match(e.request, { ignoreSearch: true, ignoreVary: true }).then((hit) => hit || fetch(e.request)));
 });
 `;
 writeFileSync(join(dist, 'sw.js'), sw);

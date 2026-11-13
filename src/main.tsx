@@ -6,10 +6,11 @@ import '@fontsource/barlow-condensed/latin-600.css';
 import '@fontsource/barlow-condensed/latin-700.css';
 import './index.css';
 import { App } from './ui/App';
+import { Crash } from './ui/Crash';
 import { initApp } from './ui/store';
 
 void initApp();
-createRoot(document.getElementById('root') as HTMLElement).render(<StrictMode><LazyMotion features={domMax} strict><MotionConfig reducedMotion="user"><App /></MotionConfig></LazyMotion></StrictMode>);
+createRoot(document.getElementById('root') as HTMLElement).render(<StrictMode><Crash><LazyMotion features={domMax} strict><MotionConfig reducedMotion="user"><App /></MotionConfig></LazyMotion></Crash></StrictMode>);
 
 // 앱 셸 오프라인 사용을 위한 Service Worker(배포 빌드에서만). 훈련 데이터는 IndexedDB에만 저장한다.
 if (import.meta.env.PROD && !import.meta.env.VITE_PREVIEW && 'serviceWorker' in navigator) {
