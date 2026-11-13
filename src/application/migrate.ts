@@ -77,3 +77,21 @@ export const migrateV19B = (db: Db, ctx: Ctx): Patch | null => {
   }
   return patch;
 };
+
+/** 예전 기본 이름 → 새 이름(Competition → Comp, Stop-and-go는 Comp 없이). 사용자가 직접 바꾼 이름은 건드리지 않는다 */
+const RENAMES: Record<string, string> = {
+  'Competition Low-bar Squat': 'Comp Low-bar Squat',
+  'Competition Paused Bench': 'Comp Paused Bench',
+  'Competition Conventional Deadlift': 'Comp Conventional Deadlift',
+  'Conventional Deadlift': 'Comp Conventional Deadlift',
+  'Competition Sumo Deadlift': 'Comp Sumo Deadlift',
+  'Competition Stop-and-go Bench': 'Stop-and-go Bench',
+};
+
+/** 운동 이름과 처방 스냅샷의 표시 이름만 바꾼다(id·기록은 그대로). 바꿀 것이 없으면 null */
+export const migrateNames = (db: Db): Patch | null => {
+  const exercises = Object.values(db.exercises).filter((e) => RENAMES[e.name] && (e.name !== 'Conventional Deadlift' || e.id === 'conv_dl')).map((e) => ({ ...e, name: RENAMES[e.name] }));
+  const instances = Object.values(db.instances).filter((i) => RENAMES[i.exerciseName] && (i.exerciseName !== 'Conventional Deadlift' || i.exerciseId === 'conv_dl'))
+    .map((i) => ({ ...i, exerciseName: RENAMES[i.exerciseName], rev: i.rev + 1 }));
+  return exercises.length || instances.length ? { put: { exercises, instances } } : null;
+};

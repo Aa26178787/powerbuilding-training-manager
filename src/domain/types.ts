@@ -32,7 +32,7 @@ export interface Exercise {
   /** bodyweight_plus: 체중 + 추가 중량(딥스·풀업). weight 필드는 추가 중량만 저장 */
   loadMode: 'external' | 'bodyweight_plus';
   barbell: boolean;
-  /** Variation 시작 중량 산출 기준(Competition 종목과 기본 계수) */
+  /** Variation 시작 중량 산출 기준(Comp 종목과 기본 계수) */
   variationOf?: { compExerciseId: string; kBase: number };
   /** 같은 동작의 다른 처방(예: 딥스 Volume ← 딥스 Strength). 자기 기록이 없을 때만 임시 추정에 쓴다 */
   relatedOf?: { exerciseId: string; kBase: number };

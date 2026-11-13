@@ -74,7 +74,7 @@ export const ProgramScreen = () => {
     setDraft(null); setNote(''); setIncr({}); toast(`새 버전을 저장했습니다. ${fmtDateKo(applyFrom)} 주부터 적용됩니다`);
   };
   const addExisting = (ex: Exercise) => {
-    // Competition·Strength 종목은 Top Set + Backoff, 그 외는 Double Progression으로 시작
+    // Comp·Strength 종목은 Top Set + Backoff, 그 외는 Double Progression으로 시작
     const tb = ex.role === 'comp' || ex.role === 'strength';
     edit((d) => dayOf(d).items.push(tb ? {
       id: `c_${wd}_${Date.now().toString(36)}`, exerciseId: ex.id, model: 'top_backoff', required: true,

@@ -4,7 +4,7 @@ import type { Db, PlannedSet, ProgramDayTemplate, ProgramVersion } from '../doma
 import { activeSession, endSession, recordSet, setSeed } from '../application/session';
 import { suggestForSet } from '../application/recommend';
 import { assignSlot, duplicateWarnings, movementVolume, slotAchievement, slotHistory, swapInstanceExercise } from '../application/slots';
-import { migrateV19B, transformDaysV19B, MIGRATION_V19B } from '../application/migrate';
+import { migrateNames, migrateV19B, transformDaysV19B, MIGRATION_V19B } from '../application/migrate';
 import { ensureWeeks } from '../application/plan';
 import { muscleVolume } from '../application/analysis';
 import { periodAchievement } from '../application/selectors';
@@ -235,7 +235,7 @@ describe('마이그레이션', () => {
     expect(db.arm).toEqual(before.arm);
     expect(db.exStates.comp_sumo).toEqual(before.exStates.comp_sumo);
     expect(db.exercises.comp_sumo).toBeTruthy();
-    expect(db.exercises.conv_dl).toMatchObject({ name: 'Competition Conventional Deadlift', role: 'comp' });
+    expect(db.exercises.conv_dl).toMatchObject({ name: 'Comp Conventional Deadlift', role: 'comp' });
     expect(db.exercises.linear_row && db.exercises.paused_conv && db.exercises.incline_machine).toBeTruthy();
     // 이번 주(이미 시작한 주)의 계획은 그대로
     expect(db.instances[`pb:${TUE}:tue_sumo`]).toBeTruthy();
@@ -253,6 +253,20 @@ describe('마이그레이션', () => {
     expect([1, 2, 3].map((wd) => count(v2.days, wd))).toEqual([1, 2, 3].map((wd) => count(OLD_DAYS, wd)));
     expect(db.settings.migrations).toContain(MIGRATION_V19B);
     expect(migrateV19B(db, ctx)).toBeNull();
+  });
+
+  it('13-1. 표시 이름: Competition → Comp, Stop-and-go Bench는 Comp 없이. 기록·id는 그대로, 직접 바꾼 이름은 유지', () => {
+    let db = makeDb();
+    db.exercises = { ...db.exercises, comp_squat: { ...db.exercises.comp_squat, name: 'Competition Low-bar Squat' }, sng_bench: { ...db.exercises.sng_bench, name: 'Competition Stop-and-go Bench' }, larsen_bench: { ...db.exercises.larsen_bench, name: '내 라센' } };
+    const inst = `pb:${MON}:mon_sq`;
+    db.instances = { ...db.instances, [inst]: { ...db.instances[inst], exerciseName: 'Competition Low-bar Squat' } };
+    db = applyPatch(db, migrateNames(db)!);
+    expect(db.exercises.comp_squat.name).toBe('Comp Low-bar Squat');
+    expect(db.exercises.sng_bench.name).toBe('Stop-and-go Bench');
+    expect(db.exercises.larsen_bench.name).toBe('내 라센');
+    expect(db.instances[inst].exerciseName).toBe('Comp Low-bar Squat');
+    expect(migrateNames(db)).toBeNull();
+    expect(DEFAULT_EXERCISES.some((e) => e.name.includes('Competition'))).toBe(false);
   });
 
   it('13-2. 새 기본 프리셋은 변환해도 그대로(새로 설치한 경우)', () => {

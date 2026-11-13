@@ -68,7 +68,7 @@ describe('반올림 정책', () => {
 });
 
 describe('최초 중량 산출', () => {
-  it('Competition 기록이 있으면 Variation 첫 중량을 8회 @7로 추정', () => {
+  it('Comp 기록이 있으면 Variation 첫 중량을 8회 @7로 추정', () => {
     let db = makeDb([MON, START]);
     db = seed(db, 'comp_bench', 100, 5, 8);
     const s = suggestForSet(db, setsOf(db, `pb:${THU}:thu_larsen`)[0], THU);
@@ -78,7 +78,7 @@ describe('최초 중량 산출', () => {
     const e = calculateConservativeE1RM(100, 5, 8);
     expect(s.load).toBe(roundLoad(loadForTarget(e * 0.925, 8, 7), 1.25, 'nearest'));
   });
-  it('Competition 기록이 없으면 워밍업 보정이 필요하고, 워밍업 세트로 시작 중량을 계산', () => {
+  it('Comp 기록이 없으면 워밍업 보정이 필요하고, 워밍업 세트로 시작 중량을 계산', () => {
     const db = makeDb();
     const s = suggestForSet(db, setsOf(db, `pb:${THU}:thu_larsen`)[0], THU);
     expect(s.needsCalibration).toBe(true);
@@ -96,7 +96,7 @@ describe('최초 중량 산출', () => {
     const hb = suggestForSet(db, setsOf(db, `pb:${WED}:wed_hsq`)[0], WED);
     expect(sng.basis?.kBase).toBe(1);
     expect(larsen.basis?.kBase).toBe(0.925);
-    expect(hb.basis).toMatchObject({ kBase: 0.925, baseExercise: 'Competition Low-bar Squat' });
+    expect(hb.basis).toMatchObject({ kBase: 0.925, baseExercise: 'Comp Low-bar Squat' });
     expect(sng.load!).toBeGreaterThan(larsen.load!);
   });
   it('Sumo 기록으로 Conventional 중량을 계산하지 않음', () => {

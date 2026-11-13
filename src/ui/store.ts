@@ -1,5 +1,5 @@
 // UI 상태 저장소: 메모리 Db + IndexedDB 반영 + 다중 탭 단일 쓰기 권한
-import { migrateV19B } from '../application/migrate';
+import { migrateNames, migrateV19B } from '../application/migrate';
 import { useSyncExternalStore } from 'react';
 import type { IDBPDatabase } from 'idb';
 import type { Db, ISODate, Patch } from '../domain/types';
@@ -78,6 +78,9 @@ export const initApp = async () => {
     // V1.9 B안(Conventional 구조·보조 운동 슬롯) 변환: 한 번만. 기록·계수·ARM은 그대로
     const v19b = migrateV19B(db, makeCtx());
     if (v19b) { await commitPatch(idb, v19b); db = applyPatch(db, v19b); }
+    // 표시 이름 정리(Competition → Comp). 사용자가 바꾼 이름은 그대로
+    const names = migrateNames(db);
+    if (names) { await commitPatch(idb, names); db = applyPatch(db, names); }
     const mig = migrateFormula(db, makeCtx());
     if (mig) { await commitPatch(idb, mig); db = applyPatch(db, mig); }
   } catch {

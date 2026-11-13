@@ -6,7 +6,7 @@
 
 | 요일 | 운동 | 처방 | 진행 |
 |---|---|---|---|
-| 화 | Competition Conventional Deadlift (`conv_dl`) | Top 1×4 @7~8, Backoff 4×4 첫 세트 @7, 상한 8 | Top+Backoff, +2.5kg, RTS e1RM × k |
+| 화 | Comp Conventional Deadlift (`conv_dl`) | Top 1×4 @7~8, Backoff 4×4 첫 세트 @7, 상한 8 | Top+Backoff, +2.5kg, RTS e1RM × k |
 | 금 | Paused Conventional Deadlift (`paused_conv`) | 3×3~5 @6.5~7.5, 상한 8(처음 3×4) | Double Progression, +2.5kg |
 | 금 | Romanian Deadlift | 2×8~10 @6.5~7.5, 상한 8 | Double Progression |
 

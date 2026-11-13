@@ -18,18 +18,18 @@ export const PAUSED_CONV_DEFAULT_PAUSE = { position: '바닥에서 바가 떨어
 /** 고정 운동(V1.9 핵심 처방) + 슬롯에서 고를 수 있는 근비대 운동 라이브러리 */
 export const DEFAULT_EXERCISES: Exercise[] = [
   // Fixed Exercise
-  ex('comp_squat', 'Competition Low-bar Squat', 'comp', 'squat', 2.5, { ...BB, fixed: true, category: 'legs', movement: 'squat' }),
-  ex('comp_bench', 'Competition Paused Bench', 'comp', 'bench', 1.25, { ...BB, fixed: true, category: 'chest', movement: 'bench_press' }),
-  ex('conv_dl', 'Competition Conventional Deadlift', 'comp', 'hinge', 2.5, { ...BB, fixed: true, category: 'legs', movement: 'deadlift' }),
+  ex('comp_squat', 'Comp Low-bar Squat', 'comp', 'squat', 2.5, { ...BB, fixed: true, category: 'legs', movement: 'squat' }),
+  ex('comp_bench', 'Comp Paused Bench', 'comp', 'bench', 1.25, { ...BB, fixed: true, category: 'chest', movement: 'bench_press' }),
+  ex('conv_dl', 'Comp Conventional Deadlift', 'comp', 'hinge', 2.5, { ...BB, fixed: true, category: 'legs', movement: 'deadlift' }),
   ex('paused_conv', 'Paused Conventional Deadlift', 'variation', 'hinge', 2.5, { ...BB, fixed: true, category: 'legs', movement: 'deadlift', pause: PAUSED_CONV_DEFAULT_PAUSE, repRange: [3, 5] }),
-  ex('sng_bench', 'Competition Stop-and-go Bench', 'variation', 'bench', 1.25, { ...BB, fixed: true, category: 'chest', movement: 'bench_press', variationOf: { compExerciseId: 'comp_bench', kBase: 1 } }),
+  ex('sng_bench', 'Stop-and-go Bench', 'variation', 'bench', 1.25, { ...BB, fixed: true, category: 'chest', movement: 'bench_press', variationOf: { compExerciseId: 'comp_bench', kBase: 1 } }),
   ex('highbar_squat', 'High-bar Squat', 'variation', 'squat', 2.5, { ...BB, fixed: true, category: 'legs', movement: 'squat', variationOf: { compExerciseId: 'comp_squat', kBase: 0.925 } }),
   ex('larsen_bench', 'Larsen Bench', 'variation', 'bench', 1.25, { ...BB, fixed: true, category: 'chest', movement: 'bench_press', variationOf: { compExerciseId: 'comp_bench', kBase: 0.925 } }),
   ex('dips_strength', 'Weighted Dips (Strength)', 'strength', 'dips', 1.25, { loadMode: 'bodyweight_plus', equipment: 'bodyweight', fixed: true, category: 'chest', movement: 'lower_chest' }),
   ex('pullup_strength', 'Weighted Pull-up (Strength)', 'strength', 'pullup', 1.25, { loadMode: 'bodyweight_plus', equipment: 'bodyweight', fixed: true, category: 'back', movement: 'vertical_pull' }),
   ex('rdl', 'Romanian Deadlift', 'variation', 'hinge', 2.5, { ...BB, fixed: true, category: 'legs', slotIds: ['hip_hinge'], movement: 'hip_hinge' }),
   // 비시즌 기본 루틴에서는 빠졌지만 기록·계수 보존과 재추가를 위해 남긴다
-  ex('comp_sumo', 'Competition Sumo Deadlift', 'comp', 'hinge', 2.5, { ...BB, category: 'legs', movement: 'deadlift' }),
+  ex('comp_sumo', 'Comp Sumo Deadlift', 'comp', 'hinge', 2.5, { ...BB, category: 'legs', movement: 'deadlift' }),
   // Lower Chest·Vertical Pull로 분류하되 Strength와 진행 상태는 따로
   ex('dips_volume', 'Weighted Dips (Volume)', 'accessory', 'dips', 1.25, { loadMode: 'bodyweight_plus', equipment: 'bodyweight', category: 'chest', slotIds: ['lower_chest'], relatedOf: { exerciseId: 'dips_strength', kBase: 1 } }),
   ex('pullup_volume', 'Weighted Pull-up (Volume)', 'accessory', 'pullup', 1.25, { loadMode: 'bodyweight_plus', equipment: 'bodyweight', category: 'back', slotIds: ['vertical_pull'], relatedOf: { exerciseId: 'pullup_strength', kBase: 1 } }),

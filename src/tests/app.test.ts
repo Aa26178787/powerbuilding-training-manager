@@ -145,7 +145,7 @@ describe('일정 이동·병합 (TC-008, 009, 011, 012, 014)', () => {
     expect(pv.warnings.some((w) => w.code === 'hinge_stack')).toBe(true);
     expect(() => commitChange(db, pv, { reason: 'gym_closed', acknowledgedWarnings: false }, makeCtx())).toThrow(/경고/);
     const after = run(db, commitChange(db, pv, { reason: 'gym_closed', acknowledgedWarnings: true }, makeCtx()));
-    // 병합일 순서: Competition 우선
+    // 병합일 순서: Comp 우선
     const fri = pv.affected.find((a) => a.date === FRI)!.after;
     expect(fri[0].exerciseId).toBe('conv_dl');
     expect(Object.values(after.changes)[0].type).toBe('merge');

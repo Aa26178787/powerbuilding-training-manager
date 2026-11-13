@@ -64,7 +64,7 @@ export const AnalysisScreen = () => {
   const fatigue = fatigueReport(db);
   const pbEx = Object.values(db.exercises).filter((e) => e.role !== 'arm');
   const ex = db.exercises[exId];
-  // SBD 중심 지표: Competition·Strength 목표 세트만
+  // SBD 중심 지표: Comp·Strength 목표 세트만
   const core = new Set(pbEx.filter((e) => e.role === 'comp' || e.role === 'strength').map((e) => e.id));
   const sbd = calculateAchievement({ plannedSets: Object.values(db.plannedSets).filter((s) => core.has(s.exerciseId)), performedDates: [], extraSetCount: 0, period, today, track: 'pb' });
   const label = mode === 'week' ? `${fmtDateKo(period.start)} ~ ${fmtDateKo(period.end)}` : `${period.start.slice(0, 4)}년 ${Number(period.start.slice(5, 7))}월`;
