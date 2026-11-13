@@ -1,4 +1,5 @@
 // UI 상태 저장소: 메모리 Db + IndexedDB 반영 + 다중 탭 단일 쓰기 권한
+import { migrateV19B } from '../application/migrate';
 import { useSyncExternalStore } from 'react';
 import type { IDBPDatabase } from 'idb';
 import type { Db, ISODate, Patch } from '../domain/types';
@@ -74,6 +75,9 @@ export const initApp = async () => {
     const exFill = exerciseDefaultsPatch(db.exercises);
     if (exFill.length) { const pt: Patch = { put: { exercises: exFill } }; await commitPatch(idb, pt); db = applyPatch(db, pt); }
     // 계산식이 바뀐 버전으로 처음 열면 계수 관측을 새 공식으로 다시 계산(수행 기록은 그대로)
+    // V1.9 B안(Conventional 구조·보조 운동 슬롯) 변환: 한 번만. 기록·계수·ARM은 그대로
+    const v19b = migrateV19B(db, makeCtx());
+    if (v19b) { await commitPatch(idb, v19b); db = applyPatch(db, v19b); }
     const mig = migrateFormula(db, makeCtx());
     if (mig) { await commitPatch(idb, mig); db = applyPatch(db, mig); }
   } catch {

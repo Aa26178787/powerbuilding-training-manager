@@ -102,13 +102,13 @@ describe('최초 중량 산출', () => {
   it('Sumo 기록으로 Conventional 중량을 계산하지 않음', () => {
     let db = makeDb();
     db = seed(db, 'comp_sumo', 200, 4, 8);
-    const s = suggestForSet(db, setsOf(db, `pb:${FRI}:fri_conv`)[0], FRI);
+    const s = suggestForSet(db, setsOf(db, `pb:${TUE}:tue_conv`)[0], TUE);
     expect(s.needsCalibration).toBe(true);
     expect(s.load).toBeNull();
     db = seed(db, 'conv_dl', 170, 4, 8);
-    const s2 = suggestForSet(db, setsOf(db, `pb:${FRI}:fri_conv`)[0], FRI);
+    const s2 = suggestForSet(db, setsOf(db, `pb:${TUE}:tue_conv`)[0], TUE);
     expect(s2.method).toBe('own_record');
-    expect(s2.basis?.targetRpe).toBe(7);
+    expect(s2.basis?.targetRpe).toBe(7.5);
   });
   it('체중이 바뀌면 딥스·풀업 추가 중량을 다시 계산하고, 음수면 보조 안내', () => {
     const sys = calculateConservativeE1RM(66 + 30, 5, 8);
@@ -151,14 +151,17 @@ describe('최초 중량 산출', () => {
   it('첫 세션 종료 후 다음 세션 진행 상태와 첫 세션 요약 생성', () => {
     let db = makeDb();
     db = seed(db, 'conv_dl', 170, 4, 8);
-    const ctx = makeCtx(FRI);
-    const sets = setsOf(db, `pb:${FRI}:fri_conv`);
-    const first = suggestForSet(db, sets[0], FRI);
-    for (const s of sets) db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'conv_dl', date: FRI, weight: first.load, reps: 4, rpe: 7.5 }, ctx));
+    const ctx = makeCtx(TUE);
+    const sets = setsOf(db, `pb:${TUE}:tue_conv`);
+    const first = suggestForSet(db, sets[0], TUE);
+    for (const s of sets) {
+      const load = suggestForSet(db, s, TUE).load;
+      db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'conv_dl', date: TUE, weight: load, reps: 4, rpe: s.type === 'top' ? 7.5 : 7 }, ctx));
+    }
     db = run(db, endSession(db, activeSession(db)!.id, ctx).patch);
     const st = db.exStates.conv_dl;
     expect(st.firstSession).toMatchObject({ recommendedLoad: first.load, actualLoad: first.load, modified: false, method: 'own_record' });
-    expect(st.firstSession?.sets.length).toBe(4);
+    expect(st.firstSession?.sets.length).toBe(5);
     expect(st.lastDecision?.action).toBe('increase');
     expect(st.nextLoad).toBe((first.load as number) + 2.5);
   });

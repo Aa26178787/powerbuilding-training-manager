@@ -19,20 +19,28 @@ export const expandGroups = (groups: SetGroupSpec[]) => {
   return out;
 };
 
+/** 프로그램 항목의 실제 운동: 슬롯 배정이 있으면 그 운동, 없으면 항목의 기본 운동 */
+export const resolveItemExercise = (db: Db, item: PrescriptionTemplate): string => {
+  const a = item.slotId ? db.settings.slotAssignments?.[item.slotId]?.exerciseId : undefined;
+  return a && db.exercises[a] && !db.exercises[a].archived ? a : item.exerciseId;
+};
+
 const buildDay = (db: Db, v: ProgramVersion, day: ProgramDayTemplate, date: ISODate) => {
   const workout: Workout = { id: `pb:${date}`, track: 'pb', label: `${day.label}요일 세션`, originalDate: date, versionId: v.id, closedAs: null, rev: 1 };
   const instances: PrescriptionInstance[] = [];
   const sets: PlannedSet[] = [];
   day.items.forEach((item: PrescriptionTemplate, idx) => {
-    const ex = db.exercises[item.exerciseId];
+    // 슬롯 처방이면 지금 슬롯에 배정된 운동으로 만든다(처방 세트·반복·RPE는 그대로)
+    const exerciseId = resolveItemExercise(db, item);
+    const ex = db.exercises[exerciseId];
     const inst: PrescriptionInstance = {
-      id: `pb:${date}:${item.id}`, workoutId: workout.id, track: 'pb', exerciseId: item.exerciseId,
-      exerciseName: ex?.name ?? item.exerciseId, order: idx * 10, model: item.model, groups: structuredClone(item.groups),
+      id: `pb:${date}:${item.id}`, workoutId: workout.id, track: 'pb', exerciseId,
+      exerciseName: ex?.name ?? exerciseId, ...(item.slotId ? { slotId: item.slotId } : {}), order: idx * 10, model: item.model, groups: structuredClone(item.groups),
       required: item.required, dpCriterion: item.dpCriterion, originalDate: date, rev: 1,
     };
     instances.push(inst);
     expandGroups(item.groups).forEach((s, i) => sets.push({
-      id: `${inst.id}:${i}`, instanceId: inst.id, workoutId: workout.id, track: 'pb', exerciseId: item.exerciseId, index: i,
+      id: `${inst.id}:${i}`, instanceId: inst.id, workoutId: workout.id, track: 'pb', exerciseId, index: i,
       ...s, originalDate: date, plannedDate: date, status: 'planned', inOriginalPlan: true, rev: 1,
     }));
   });
@@ -61,7 +69,7 @@ export const ensureWeeks = (db: Db, weekStarts: ISODate[]): Patch => {
 };
 
 /** 손대지 않은 미래 주(다음 주 이후)의 계획을 지워 새 버전으로 다시 생성되게 한다 */
-const dropUntouchedFuture = (db: Db, fromWeek: ISODate): Patch => {
+export const dropUntouchedFuture = (db: Db, fromWeek: ISODate): Patch => {
   const del = { workouts: [] as string[], instances: [] as string[], plannedSets: [] as string[] };
   for (const w of Object.values(db.workouts)) {
     if (w.track !== 'pb' || w.originalDate < fromWeek || w.closedAs) continue;
@@ -73,6 +81,14 @@ const dropUntouchedFuture = (db: Db, fromWeek: ISODate): Patch => {
     del.instances.push(...Object.values(db.instances).filter((i) => i.workoutId === w.id).map((i) => i.id));
   }
   return { del };
+};
+
+/** 새 프로그램 버전의 적용 시작 주: 시작 전이면 시작 주, 시작 후면 다음 주 */
+export const nextEffectiveFrom = (db: Db, today: ISODate, noStartFallback?: ISODate): ISODate => {
+  const thisWeek = weekStart(today);
+  const start = db.settings.programStart;
+  if (!start) return noStartFallback ?? thisWeek;
+  return weekStart(start) <= thisWeek ? addDays(thisWeek, 7) : weekStart(start);
 };
 
 /**
@@ -89,10 +105,7 @@ export const saveProgramVersion = (db: Db, days: ProgramDayTemplate[], changeNot
     }
   }
   const latest = Object.values(db.versions).sort((a, b) => b.version - a.version)[0];
-  const thisWeek = weekStart(ctx.today);
-  const started = db.settings.programStart && weekStart(db.settings.programStart) <= thisWeek;
-  // 프로그램 시작 전이면 시작 주부터, 시작 후면 다음 주부터 적용
-  const effectiveFrom = started ? addDays(thisWeek, 7) : weekStart(db.settings.programStart ?? ctx.today);
+  const effectiveFrom = nextEffectiveFrom(db, ctx.today);
   const version: ProgramVersion = {
     id: `pv-${ctx.newId()}`, name: latest?.name ?? 'Program', version: (latest?.version ?? 0) + 1,
     createdAt: ctx.now, effectiveFrom, days: structuredClone(days), changeNote,

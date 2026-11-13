@@ -1,7 +1,7 @@
 // 앱 셸: 하단 탭, 저장 상태 표시, 알림
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { BicepsFlexed, CalendarDays, ChartLine, ChevronRight, Dumbbell, Ellipsis, FlaskConical, History, House, ListChecks, Settings as SettingsIcon, X, type LucideIcon } from 'lucide-react';
+import { BicepsFlexed, CalendarDays, ChartLine, ChevronRight, Dumbbell, Ellipsis, FlaskConical, History, Library, House, ListChecks, Settings as SettingsIcon, X, type LucideIcon } from 'lucide-react';
 import type { ISODate } from '../domain/types';
 import { AnimatePresence, m } from 'motion/react';
 import { dismissToast, toast as showToast, todayStr, useApp } from './store';
@@ -12,16 +12,18 @@ import { DayScreen } from './screens/Day';
 import { CalendarScreen } from './screens/Calendar';
 import { ArmScreen } from './screens/Arm';
 import { ProgramScreen } from './screens/Program';
+import { LibraryScreen } from './screens/Library';
 import { HistoryScreen } from './screens/History';
 import { SettingsScreen } from './screens/Settings';
 import { AnalysisScreen } from './screens/Analysis';
 import { ModelLabScreen } from './screens/ModelLab';
 import { Onboarding } from './screens/Onboarding';
 
-type Tab = 'home' | 'day' | 'calendar' | 'arm' | 'more' | 'program' | 'history' | 'settings' | 'analysis' | 'lab';
+type Tab = 'home' | 'day' | 'calendar' | 'arm' | 'more' | 'program' | 'library' | 'history' | 'settings' | 'analysis' | 'lab';
 const NAV: [Tab, string, LucideIcon][] = [['home', '홈', House], ['day', '오늘', Dumbbell], ['calendar', '캘린더', CalendarDays], ['arm', 'ARM', BicepsFlexed], ['more', '더보기', Ellipsis]];
 const MORE: [Tab, string, string, LucideIcon][] = [
-  ['program', '프로그램 조회·편집', '요일별 운동, 세트·반복·RPE', ListChecks],
+  ['program', '프로그램 조회·편집', '요일별 운동·슬롯, 세트·반복·RPE', ListChecks],
+  ['library', '운동 라이브러리', 'Category → Slot → Exercise, 운동 추가·즐겨찾기', Library],
   ['history', '운동 기록', '운동별 이력, 수정·삭제·복원', History],
   ['analysis', '분석', '근육군별 세트, 추세 그래프, 피로 신호', ChartLine],
   ['lab', '모델 실험실', '개인화 계수, 예측 오차, RTS RPE 표', FlaskConical],
@@ -71,6 +73,16 @@ export const App = () => {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+  // 다른 화면에서 보내는 이동 요청(예: 운동 바꾸기 → 라이브러리)
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const t = (e as CustomEvent<string>).detail as Tab;
+      trail.current = [...trail.current.filter((x) => x !== t), tabRef.current].slice(-6);
+      setTab(t);
+    };
+    window.addEventListener('ptm-nav', onNav);
+    return () => window.removeEventListener('ptm-nav', onNav);
+  }, []);
 
   // 세션 진행 중 화면 꺼짐 방지(Wake Lock). 화면이 다시 보이면 재요청한다
   const sessionOn = !!db && !!activeSession(db);
@@ -100,7 +112,7 @@ export const App = () => {
       setTab(t as Tab);
     });
   };
-  const active: Tab = ['program', 'history', 'settings', 'analysis', 'lab'].includes(tab) ? 'more' : tab;
+  const active: Tab = ['program', 'library', 'history', 'settings', 'analysis', 'lab'].includes(tab) ? 'more' : tab;
 
   return (
     <div className="mx-auto flex min-h-full max-w-[520px] flex-col">
@@ -123,6 +135,7 @@ export const App = () => {
         {tab === 'calendar' && <CalendarScreen go={go} />}
         {tab === 'arm' && <ArmScreen go={go} />}
         {tab === 'program' && <ProgramScreen />}
+        {tab === 'library' && <LibraryScreen />}
         {tab === 'history' && <HistoryScreen />}
         {tab === 'settings' && <SettingsScreen />}
         {tab === 'analysis' && <AnalysisScreen />}

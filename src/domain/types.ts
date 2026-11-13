@@ -11,7 +11,10 @@ export type ProgressionModel = 'top_backoff' | 'straight_linear' | 'double_progr
 export type ExerciseRole = 'comp' | 'strength' | 'variation' | 'accessory' | 'arm';
 export type Pattern =
   | 'squat' | 'bench' | 'hinge' | 'dips' | 'pullup' | 'row'
-  | 'chest_acc' | 'delts' | 'quads' | 'hams' | 'core' | 'triceps' | 'arm' | 'other';
+  | 'chest_acc' | 'delts' | 'quads' | 'hams' | 'core' | 'triceps' | 'biceps' | 'forearms' | 'glutes' | 'adductors' | 'calves' | 'traps' | 'erectors' | 'arm' | 'other';
+
+/** 장비 유형. 같은 이름이라도 장비가 다르면 다른 운동으로 등록해 기록·진행을 따로 둔다 */
+export type EquipmentType = 'barbell' | 'dumbbell' | 'machine' | 'plate_loaded' | 'cable' | 'smith' | 'bodyweight' | 'other';
 
 export interface Exercise {
   id: string;
@@ -39,6 +42,25 @@ export interface Exercise {
   bodyweightOnly?: boolean;
   /** 근육군별 세트 가중치(주동근 1.0, 보조근 0.5 근사). 없으면 기본표 사용 */
   muscles?: Record<string, number>;
+  /** 주동근·보조근(가중치 1.0 / 0.5). 있으면 muscles보다 우선 */
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
+  /** 라이브러리 분류(Category). 운동이 들어갈 수 있는 슬롯은 slotIds */
+  category?: string;
+  slotIds?: string[];
+  /** 운동 패턴 집계용 키(슬롯이 없는 고정 운동: squat, bench_press, deadlift 등) */
+  movement?: string;
+  equipment?: EquipmentType;
+  /** 권장 반복수 범위(선택) */
+  repRange?: [number, number];
+  /** 한쪽씩 하는 운동 */
+  unilateral?: boolean;
+  /** V1.9 고정 운동(슬롯 교체 대상이 아님) */
+  fixed?: boolean;
+  /** 정지 변형의 정지 위치·시간(Paused Conventional 등). 사용자가 바꿀 수 있다 */
+  pause?: { position: string; seconds: number };
+  /** 사용자가 만든 운동 */
+  custom?: boolean;
   archived?: boolean;
 }
 
@@ -58,7 +80,10 @@ export interface SetGroupSpec {
 
 export interface PrescriptionTemplate {
   id: string;
+  /** 슬롯 처방이면 기본 선택 운동. 실제 운동은 슬롯 배정(settings.slotAssignments)을 따른다 */
   exerciseId: string;
+  /** 근비대 보조 슬롯(Upper Chest 등). 없으면 고정 운동 */
+  slotId?: string;
   model: ProgressionModel;
   groups: SetGroupSpec[];
   required: boolean;
@@ -123,6 +148,8 @@ export interface PrescriptionInstance {
   track: Track;
   exerciseId: string;
   exerciseName: string;
+  /** 슬롯 처방이면 슬롯 id. 운동을 바꿔도 슬롯과 처방(세트·반복·RPE)은 그대로 */
+  slotId?: string;
   order: number;
   model: ProgressionModel;
   groups: SetGroupSpec[];
@@ -450,7 +477,30 @@ export interface Settings {
   rpeDriftPerSet: number;
   /** P1 EMA 설정(초기 설계값) */
   ema: { lambdaStrength: number; lambdaVariation: number; clampPct: number };
+  /** 슬롯별 현재 선택 운동 */
+  slotAssignments?: Record<string, ExerciseAssignment>;
+  /** 사용자가 만든 슬롯 */
+  customSlots?: TrainingSlot[];
+  /** 즐겨찾기 운동 id */
+  favorites?: string[];
+  /** 한 번만 실행하는 데이터 변환 기록 */
+  migrations?: string[];
 }
+
+/** 근육군 묶음(Chest, Back, Delts …) */
+export interface ExerciseCategory { id: string; name: string; order: number }
+/** 운동 슬롯: 훈련 목적(부위·패턴). 처방은 프로그램 항목(SlotPrescription)이 가진다 */
+export interface TrainingSlot { id: string; name: string; categoryId: string; group?: string; description: string; custom?: boolean }
+/** 슬롯 처방 = 슬롯이 지정된 프로그램 항목 */
+export type SlotPrescription = PrescriptionTemplate & { slotId: string };
+/** 슬롯에 지금 배정된 실제 운동 */
+export interface ExerciseAssignment { slotId: string; exerciseId: string; since: ISODateTime }
+/** 운동별 진행 상태(작업 중량·연속 실패·계수). 운동 id마다 독립 */
+export type ExerciseProgression = ExerciseState;
+/** 운동별 근육 가중치(주동근 1.0, 보조근 0.5) */
+export interface ExerciseMuscleWeight { exerciseId: string; muscle: string; weight: number; role: 'primary' | 'secondary' }
+/** 운동의 장비 조건 */
+export interface Equipment { type: EquipmentType; loadStep?: number; loadUnit?: 'total' | 'per_hand' | 'machine'; detail?: ExerciseState['equipment'] }
 
 export interface Db {
   settings: Settings;

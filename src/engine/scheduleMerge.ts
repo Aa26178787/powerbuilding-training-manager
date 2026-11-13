@@ -52,7 +52,8 @@ const isLive = (s: PlannedSet) => s.status !== 'removed';
 
 const PATTERN_KO: Record<string, string> = {
   squat: '스쿼트', bench: '벤치', hinge: '힙힌지', dips: '딥스', pullup: '풀업', row: '로우', chest_acc: '가슴 보조', delts: '삼각근',
-  quads: '대퇴사두', hams: '햄스트링', core: '복근', triceps: '삼두', arm: 'ARM', other: '기타',
+  quads: '대퇴사두', hams: '햄스트링', core: '복근', triceps: '삼두', biceps: '이두', forearms: '전완', glutes: '둔근', adductors: '내전근',
+  calves: '종아리', traps: '승모근', erectors: '척추기립근', arm: 'ARM', other: '기타',
 };
 
 /** 한 날짜의 수행 예정 목록(운동 단위 묶음, 수행 순서대로) */

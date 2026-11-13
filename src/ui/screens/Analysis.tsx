@@ -2,9 +2,11 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import type { Exercise, ISODate } from '../../domain/types';
-import { MUSCLES, musclesOf } from '../../domain/defaults';
+import { DEFAULT_EXERCISES, MUSCLES, musclesOf } from '../../domain/defaults';
 import { addDays, addMonths, fmtDateKo, monthEnd, monthStart, weekStart } from '../../engine/dates';
 import { calculateAchievement } from '../../engine/achievement';
+import { movementVolume, slotAchievement } from '../../application/slots';
+import { movementName, slotById } from '../../domain/slots';
 import { exerciseTrend, fatigueReport, muscleVolume, weeklyAchievementTrend } from '../../application/analysis';
 import { run, toast, todayStr, useApp } from '../store';
 import { Btn, Chip, Empty, Row, SectionTitle, Sheet } from '../components';
@@ -18,8 +20,17 @@ const WeightEditor = ({ ex, onClose }: { ex: Exercise; onClose: () => void }) =>
   return (
     <Sheet title={`${ex.name} 근육군 가중치`} onClose={onClose} footer={
       <div className="flex gap-2">
-        <Btn onClick={async () => { const { muscles: _drop, ...rest } = ex; void _drop; const r = await run(() => ({ put: { exercises: [rest as Exercise] } })); if (r.ok) onClose(); }}>기본값으로</Btn>
-        <Btn kind="primary" className="flex-1" onClick={async () => { const r = await run(() => ({ put: { exercises: [{ ...ex, muscles: Object.fromEntries(Object.entries(w).filter(([, v]) => v > 0)) }] } })); if (r.ok) { toast('가중치를 저장했습니다'); onClose(); } }}>저장</Btn>
+        <Btn onClick={async () => {
+          const { muscles: _a, primaryMuscles: _b, secondaryMuscles: _c, ...rest } = ex; void _a; void _b; void _c;
+          const d = DEFAULT_EXERCISES.find((x) => x.id === ex.id);
+          const r = await run(() => ({ put: { exercises: [{ ...rest, ...(d?.primaryMuscles ? { primaryMuscles: d.primaryMuscles, secondaryMuscles: d.secondaryMuscles } : {}) } as Exercise] } }));
+          if (r.ok) onClose();
+        }}>기본값으로</Btn>
+        <Btn kind="primary" className="flex-1" onClick={async () => {
+          const m = Object.fromEntries(Object.entries(w).filter(([, v]) => v > 0));
+          const r = await run(() => ({ put: { exercises: [{ ...ex, muscles: m, primaryMuscles: Object.keys(m).filter((k) => m[k] >= 1), secondaryMuscles: Object.keys(m).filter((k) => m[k] < 1) }] } }));
+          if (r.ok) { toast('가중치를 저장했습니다'); onClose(); }
+        }}>저장</Btn>
       </div>}>
       <p className="mb-2 text-xs text-dust">주동근 1.0, 주요 보조근 0.5가 기본입니다. 근사치이므로 본인 기준에 맞게 바꿀 수 있습니다.</p>
       <ul className="divide-y divide-rail">
@@ -46,6 +57,8 @@ export const AnalysisScreen = () => {
   if (!db) return null;
   const period = mode === 'week' ? { start: weekStart(anchor), end: addDays(weekStart(anchor), 6) } : { start: monthStart(anchor), end: monthEnd(anchor) };
   const vol = muscleVolume(db, period);
+  const mv = movementVolume(db, period);
+  const slotRows = slotAchievement(db, period).sort((a, b) => (slotById(db, a.slotId)?.name ?? '').localeCompare(slotById(db, b.slotId)?.name ?? ''));
   const trend = exerciseTrend(db, exId);
   const weekly = weeklyAchievementTrend(db, today, 10);
   const fatigue = fatigueReport(db);
@@ -74,13 +87,42 @@ export const AnalysisScreen = () => {
           <Btn kind="quiet" onClick={() => shift(-1)} aria-label="이전 기간"><ChevronLeft size={20} /></Btn>
           <span className="flex items-center gap-2"><span className="num text-[13px] whitespace-nowrap">{label}</span><Chip onClick={() => { setAnchor(today); setMode(mode === 'week' ? 'month' : 'week'); }}>{mode === 'week' ? '월간' : '주간'}</Chip></span>
           <Btn kind="quiet" onClick={() => shift(1)} aria-label="다음 기간"><ChevronRight size={20} /></Btn>
-        </div>}>근육군별 세트</SectionTitle>
+        </div>}>Muscle Group</SectionTitle>
       <div className="rounded-xl bg-steel p-3">
         {vol.length === 0 ? <p className="text-sm text-dust">이 기간에 완료한 세트가 없습니다.</p>
           : <StackedBars names={['직접(주동근)', '간접(보조근 가중)']} rows={vol.map((v) => ({ label: MUSCLE_KO[v.muscle] ?? v.muscle, a: v.direct, b: v.indirect }))} />}
-        <p className="mt-3 text-xs text-dust">실제로 완료한 세트만 셉니다(계획 외 세트 포함, ARM 제외). 주동근 1.0·보조근 0.5는 추정 관리 지표입니다.</p>
+        <p className="mt-3 text-xs text-dust">근육군별 가중 유효 세트. 실제로 완료한 세트만 셉니다(계획 외 세트 포함, ARM 제외). 주동근 1.0, 보조근 0.5는 추정 관리 지표입니다.</p>
         <Row label="SBD·Strength 계획 세트">{sbd.original.total ? `${sbd.original.done}/${sbd.original.total}세트 (${sbd.original.pct}%)` : '계획 없음'}</Row>
       </div>
+
+      <SectionTitle>Movement Pattern</SectionTitle>
+      <div className="rounded-xl bg-steel p-3">
+        {mv.length === 0 ? <p className="text-sm text-dust">이 기간에 완료한 세트가 없습니다.</p> : (
+          <ul className="space-y-1.5">
+            {mv.map((r) => (
+              <li key={r.movement} className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-2 text-[13px]">
+                <span className="truncate">{movementName(db, r.movement)}</span>
+                <span className="h-2 rounded-full bg-rail"><span className="block h-2 rounded-full bg-chalk/80" style={{ width: `${(r.sets / Math.max(...mv.map((x) => x.sets))) * 100}%` }} /></span>
+                <span className="num-d w-8 text-right text-[15px]">{r.sets}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-xs text-dust">운동 패턴별 실제 작업 세트 수(가중치 없음). 근육군 유효 세트와 다른 지표라 합치지 않습니다.</p>
+      </div>
+
+      {slotRows.length > 0 && (<>
+        <SectionTitle>슬롯 달성</SectionTitle>
+        <ul className="divide-y divide-rail rounded-xl bg-steel px-3">
+          {slotRows.map((r) => (
+            <li key={r.slotId} className="flex min-h-11 items-center justify-between gap-2 text-sm">
+              <span className="min-w-0"><span className="block truncate">{slotById(db, r.slotId)?.name ?? r.slotId}</span><span className="block truncate text-[12px] text-dust">{r.exercises.map((id) => db.exercises[id]?.name ?? id).join(', ')}</span></span>
+              <span className="num-d shrink-0 text-[15px]">{r.done}/{r.planned}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-1 text-xs text-dust">운동을 바꿔도 슬롯 처방 기준으로 이어서 셉니다.</p>
+      </>)}
 
       <SectionTitle>운동별 추세</SectionTitle>
       <select className="field" value={exId} onChange={(e) => setExId(e.target.value)} aria-label="운동 선택">

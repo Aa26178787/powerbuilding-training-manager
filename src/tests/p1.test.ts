@@ -124,7 +124,7 @@ describe('근육군 가중 세트 (FR-080)', () => {
     const pv = previewChange(db, { kind: 'status', setIds: tue.map((s) => s.id), status: 'excused' });
     const d = Object.fromEntries(muscleDelta(db, pv.setPatches.map((p) => p.id)).map((r) => [r.muscle, r.total]));
     expect(d.lats).toBe(3 + 4);
-    expect(d.hams).toBe(2.5 + 2);
+    expect(d.hams).toBe(5 + 2); // Conventional Top+Backoff 5세트 + Knee Flexion 2세트
     expect(commitChange(db, pv, { reason: 'gym_closed', acknowledgedWarnings: true }, makeCtx()).put!.plannedSets!.length).toBe(17);
   });
 });
@@ -147,11 +147,11 @@ describe('추세·피로·CSV', () => {
   it('CSV: 수식 주입 방지·이스케이프', () => {
     let db = makeDb();
     const s = setsOf(db, `pb:${START}:mon_row`)[0];
-    db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'cs_row', date: START, weight: 60, reps: 10, rpe: 7, note: '=SUM(A1), "메모"' }, makeCtx()));
+    db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'linear_row', date: START, weight: 60, reps: 10, rpe: 7, note: '=SUM(A1), "메모"' }, makeCtx()));
     const csv = performedCsv(db);
     expect(csv.split('\n').length).toBe(3);
     expect(csv).toContain(`"'=SUM(A1), ""메모"""`);
-    expect(csv).toContain('Chest-supported Row,pb,volume');
+    expect(csv).toContain('Linear Row,pb,volume');
   });
 });
 

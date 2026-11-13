@@ -75,6 +75,8 @@ src/
 
 최초 중량 산출, 가벼운 세트 보정, 반올림 정책, Fast-track 규칙은 [`docs/spec-initial-load.md`](docs/spec-initial-load.md)에 있습니다.
 
+B안(화요일 Conventional Main, 금요일 Paused Conventional)과 보조 운동 슬롯 구조는 [`docs/spec-slots-b.md`](docs/spec-slots-b.md)에 있습니다.
+
 ## 하지 않은 것
 
 - 서버 동기화·다중 기기(백엔드 필요), 사진·영상 첨부, 대회 준비(피킹) 블록, 병합 후보 자동 최적화

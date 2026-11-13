@@ -23,10 +23,10 @@ const ach = (db: Db, today = '2026-12-06', period = week) => calculateAchievemen
 });
 
 describe('주간 계획 생성', () => {
-  it('V1.9 프리셋 5일·81세트, 다시 호출해도 중복 생성 없음', () => {
+  it('V1.9 프리셋 5일·80세트, 다시 호출해도 중복 생성 없음', () => {
     const db = makeDb();
     expect(Object.keys(db.workouts).length).toBe(5);
-    expect(Object.keys(db.plannedSets).length).toBe(81);
+    expect(Object.keys(db.plannedSets).length).toBe(80);
     expect(setsOf(db, (s) => s.plannedDate === MON).length).toBe(22);
     expect(ensureWeeks(db, [MON])).toEqual({});
   });
@@ -85,7 +85,7 @@ describe('세트 기록·추천 (TC-001~003, TC-013)', () => {
     let db = makeDb();
     const ctx = makeCtx(MON);
     const s = setsOf(db, (x) => x.instanceId === `pb:${MON}:mon_row`)[0];
-    db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'cs_row', date: MON, weight: 60, reps: 10, rpe: 7 }, ctx));
+    db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'linear_row', date: MON, weight: 60, reps: 10, rpe: 7 }, ctx));
     const id = Object.keys(db.performed)[0];
     db = run(db, editPerformedSet(db, id, { reps: 12 }, ctx));
     expect(db.performed[id].reps).toBe(12);
@@ -93,8 +93,8 @@ describe('세트 기록·추천 (TC-001~003, TC-013)', () => {
     db = run(db, deletePerformedSet(db, id, ctx));
     expect(db.performed[id].deleted).toBe(true);
     expect(db.plannedSets[s.id].status).toBe('planned');
-    expect(() => recordSet(db, { plannedSetId: s.id, exerciseId: 'cs_row', date: MON, weight: -1, reps: 10 }, ctx)).toThrow();
-    expect(() => recordSet(db, { plannedSetId: s.id, exerciseId: 'cs_row', date: MON, weight: 60, reps: 10, rpe: 7.3 }, ctx)).toThrow();
+    expect(() => recordSet(db, { plannedSetId: s.id, exerciseId: 'linear_row', date: MON, weight: -1, reps: 10 }, ctx)).toThrow();
+    expect(() => recordSet(db, { plannedSetId: s.id, exerciseId: 'linear_row', date: MON, weight: 60, reps: 10, rpe: 7.3 }, ctx)).toThrow();
   });
   it('조기 종료는 skipped_by_autoregulation: 원본에는 미완료, 조정 계획 분모에서는 제외', () => {
     let db = makeDb();
@@ -103,8 +103,8 @@ describe('세트 기록·추천 (TC-001~003, TC-013)', () => {
     for (const s of sq.slice(0, 3)) db = run(db, recordSet(db, { plannedSetId: s.id, exerciseId: 'comp_squat', date: MON, weight: 140, reps: 5, rpe: 8 }, ctx));
     db = run(db, skipSets(db, sq.slice(3).map((s) => s.id), true, '상한 초과 예상', ctx));
     const r = ach(db);
-    expect(r.original).toMatchObject({ done: 3, total: 81 });
-    expect(r.adjusted).toMatchObject({ done: 3, total: 79 });
+    expect(r.original).toMatchObject({ done: 3, total: 80 });
+    expect(r.adjusted).toMatchObject({ done: 3, total: 78 });
     expect(r.autoregSkippedSets).toBe(2);
     expect(db.exStates.comp_squat.lastDecision).toBeTruthy();
   });
@@ -133,21 +133,21 @@ describe('일정 이동·병합 (TC-008, 009, 011, 012, 014)', () => {
     expect(setsOf(db, (s) => s.originalDate === THU).length).toBe(13);
     const byDate = new Map([['2026-12-05', new Set([`pb:${THU}`])]]);
     expect(deriveWorkoutStatus(db.workouts[`pb:${THU}`], thu.map((s) => db.plannedSets[s.id]), '2026-12-04', byDate)).toBe('rescheduled');
-    expect(ach(db).original.total).toBe(81); // 이동만으로 분모·크레딧 변화 없음
+    expect(ach(db).original.total).toBe(80); // 이동만으로 분모·크레딧 변화 없음
     expect(ach(db).original.done).toBe(0);
   });
-  it('Sumo를 금요일(Conventional+RDL)로 병합: 경고·승인 요구, 조용한 합침 금지', () => {
+  it('화요일 Conventional을 금요일(Paused Conventional+RDL)로 병합: 경고·승인 요구, 조용한 합침 금지', () => {
     const db = makeDb();
-    const sumo = setsOf(db, (s) => s.instanceId === `pb:${TUE}:tue_sumo`);
-    const pv = previewChange(db, { kind: 'move', setIds: sumo.map((s) => s.id), toDate: FRI });
+    const conv = setsOf(db, (s) => s.instanceId === `pb:${TUE}:tue_conv`);
+    const pv = previewChange(db, { kind: 'move', setIds: conv.map((s) => s.id), toDate: FRI });
     expect(pv.type).toBe('merge');
-    expect(pv.warnings.some((w) => w.code === 'heavy_sbd_stack' && w.severity === 'approval')).toBe(true);
+    expect(pv.warnings.some((w) => w.code === 'hinge_stack' && w.severity === 'approval')).toBe(true);
     expect(pv.warnings.some((w) => w.code === 'hinge_stack')).toBe(true);
     expect(() => commitChange(db, pv, { reason: 'gym_closed', acknowledgedWarnings: false }, makeCtx())).toThrow(/경고/);
     const after = run(db, commitChange(db, pv, { reason: 'gym_closed', acknowledgedWarnings: true }, makeCtx()));
     // 병합일 순서: Competition 우선
     const fri = pv.affected.find((a) => a.date === FRI)!.after;
-    expect(fri[0].exerciseId).toBe('comp_sumo');
+    expect(fri[0].exerciseId).toBe('conv_dl');
     expect(Object.values(after.changes)[0].type).toBe('merge');
   });
   it('화요일 전체를 수요일로: 중량 리프트 중첩과 연속일 경고', () => {
@@ -180,8 +180,8 @@ describe('일정 이동·병합 (TC-008, 009, 011, 012, 014)', () => {
     const pv = previewChange(db, { kind: 'status', setIds: tue.map((s) => s.id), status: 'excused', statusReason: '휴관' });
     db = run(db, commitChange(db, pv, { reason: 'gym_closed', acknowledgedWarnings: true }, makeCtx()));
     const r = ach(db);
-    expect(r.original).toMatchObject({ done: 0, total: 81 });
-    expect(r.adjusted.total).toBe(64);
+    expect(r.original).toMatchObject({ done: 0, total: 80 });
+    expect(r.adjusted.total).toBe(63);
     expect(r.excusedSets).toBe(17);
     expect(deriveWorkoutStatus(db.workouts[`pb:${TUE}`], tue.map((s) => db.plannedSets[s.id]), TUE, new Map())).toBe('excused');
   });
@@ -220,8 +220,8 @@ describe('일정 이동·병합 (TC-008, 009, 011, 012, 014)', () => {
     db = run(db, commitChange(db, red, { reason: 'user_choice', acknowledgedWarnings: true }, makeCtx()));
     db = run(db, addPlannedSets(db, `pb:${MON}:mon_lat`, 1, MON, makeCtx()));
     const r = ach(db);
-    expect(r.original.total).toBe(81);
-    expect(r.adjusted.total).toBe(81 - 2 + 1);
+    expect(r.original.total).toBe(80);
+    expect(r.adjusted.total).toBe(80 - 2 + 1);
     const sw = previewChange(db, { kind: 'swap', dateA: TUE, dateB: THU });
     expect(sw.ok).toBe(true);
     db = run(db, commitChange(db, sw, { reason: 'user_choice', acknowledgedWarnings: true }, makeCtx()));
@@ -233,7 +233,7 @@ describe('일정 이동·병합 (TC-008, 009, 011, 012, 014)', () => {
     expect(deriveWorkoutStatus(db.workouts[`pb:${MON}`], mon, WED, new Map())).toBe('overdue');
     db = run(db, closeWorkout(db, `pb:${MON}`, 'missed', makeCtx(WED)));
     expect(deriveWorkoutStatus(db.workouts[`pb:${MON}`], setsOf(db, (s) => s.workoutId === `pb:${MON}`), WED, new Map())).toBe('missed');
-    expect(ach(db).original).toMatchObject({ done: 0, total: 81 });
+    expect(ach(db).original).toMatchObject({ done: 0, total: 80 });
   });
 });
 
@@ -281,7 +281,7 @@ describe('ARM (TC-015~018)', () => {
     expect(db.settings.armCursor).toBe(1);
     expect(() => assignArmDay(db, 0, TUE, makeCtx())).toThrow();
     // ARM은 파워빌딩 달성률 분모에 들어가지 않음
-    expect(ach(db).original.total).toBe(81);
+    expect(ach(db).original.total).toBe(80);
   });
   it('원본 누락 항목은 자동 추정 없이 세트 0개 → 사용자가 직접 입력하면 생성', () => {
     let db = withArm();

@@ -10,7 +10,7 @@ import { ask, isStandalone, promptInstall, requestPersist, restoreBackup, run, t
 import { Minus, Plus, X } from 'lucide-react';
 import { Badge, Btn, Chip, PLATE_COLOR, Row, SectionTitle } from '../components';
 
-export const SEED_EXERCISES = ['comp_squat', 'comp_bench', 'comp_sumo', 'conv_dl', 'dips_strength', 'pullup_strength'];
+export const SEED_EXERCISES = ['comp_squat', 'comp_bench', 'conv_dl', 'dips_strength', 'pullup_strength'];
 
 export const SeedEditor = ({ db, exerciseId, compact }: { db: Db; exerciseId: string; compact?: boolean }) => {
   const ex = db.exercises[exerciseId];

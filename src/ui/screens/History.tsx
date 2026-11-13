@@ -4,8 +4,10 @@ import type { PerformedSet } from '../../domain/types';
 import { fmtDateKo } from '../../engine/dates';
 import { conservativeE1RM, validateSetInput } from '../../engine/e1rm';
 import { deletePerformedSet, editPerformedSet, restorePerformedSet, setNextLoad } from '../../application/session';
+import { slotHistory } from '../../application/slots';
+import { allSlots } from '../../domain/slots';
 import { run, toast, useApp } from '../store';
-import { Badge, Btn, Empty, fmtKg, RpePicker, SectionTitle, Sheet, Stepper } from '../components';
+import { Badge, Btn, cx, Empty, fmtKg, RpePicker, SectionTitle, Sheet, Stepper } from '../components';
 
 export const HistoryScreen = () => {
   const { db } = useApp();
@@ -13,7 +15,40 @@ export const HistoryScreen = () => {
   const [edit, setEdit] = useState<PerformedSet | null>(null);
   const [w, setW] = useState(''); const [r, setR] = useState(''); const [rpe, setRpe] = useState<number | null>(null);
   const [next, setNext] = useState('');
+  const [mode, setMode] = useState<'exercise' | 'slot'>('exercise');
+  const [slotId, setSlotId] = useState('');
   if (!db) return null;
+  const tabs = (
+    <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-steel p-1" role="tablist" aria-label="기록 보기">
+      {([['exercise', 'Exercise History'], ['slot', 'Slot History']] as const).map(([k, l]) => (
+        <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)} className={cx('h-11 rounded-lg text-[13px] font-semibold', mode === k ? 'bg-deck text-chalk' : 'text-dust')}>{l}</button>
+      ))}
+    </div>
+  );
+  if (mode === 'slot') {
+    const withData = allSlots(db).filter((x) => Object.values(db.instances).some((i) => i.slotId === x.id));
+    const sid = slotId || withData[0]?.id || '';
+    const hist = sid ? slotHistory(db, sid) : [];
+    return (
+      <div>
+        <header><h1 className="text-lg font-extrabold">운동 기록</h1><p className="text-sm text-dust">Slot History는 부위별로 훈련을 해냈는지, Exercise History는 운동별 중량·반복 변화를 봅니다.</p></header>
+        {tabs}
+        <select className="field mt-3" value={sid} onChange={(e) => setSlotId(e.target.value)} aria-label="슬롯 선택">
+          {withData.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+        {hist.length === 0 ? <div className="mt-3"><Empty>이 슬롯에서 끝낸 세트가 아직 없습니다.</Empty></div> : (
+          <ul className="mt-3 divide-y divide-rail rounded-xl bg-steel px-3">
+            {hist.map((h) => (
+              <li key={`${h.date}${h.exerciseId}`} className="py-2.5">
+                <div className="flex items-baseline justify-between gap-2 text-sm"><span className="font-semibold">{db.exercises[h.exerciseId]?.name ?? h.exerciseId}</span><span className="num text-xs text-dust">{fmtDateKo(h.date)}</span></div>
+                <div className="num-d mt-0.5 text-[14px] text-dust">{h.sets.length}세트, {h.sets.map((p) => `${p.weight === null ? '' : `${fmtKg(p.weight)}×`}${p.reps ?? `${p.seconds}초`}`).join(' ')}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
   const all = Object.values(db.performed);
   const used = [...new Set(all.map((p) => p.exerciseId))].map((id) => db.exercises[id]).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
   const sel = exId || used[0]?.id || '';
@@ -31,6 +66,7 @@ export const HistoryScreen = () => {
   return (
     <div>
       <header><h1 className="text-lg font-extrabold">운동 기록</h1></header>
+      {tabs}
       {used.length === 0 ? <div className="mt-4"><Empty>아직 기록이 없습니다. 오늘 화면에서 세트를 완료하면 여기에 쌓입니다.</Empty></div> : (
         <>
           <select className="field mt-3" value={sel} onChange={(e) => setExId(e.target.value)} aria-label="운동 선택">

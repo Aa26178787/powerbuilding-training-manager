@@ -70,16 +70,16 @@ with sync_playwright() as p:
         pg.wait_for_timeout(450); res[key] = pg.evaluate(JS); pg.screenshot(path=f'{D}{theme}-{key}.png')
     pg.tap('nav >> text=홈'); check('home')
     pg.tap('nav >> text=오늘'); pg.wait_for_timeout(300); pg.tap('button:has-text("ARM ")'); pg.evaluate('scrollTo(0,0)'); check('day')
-    sec = pg.locator('section[aria-label="Conventional Deadlift"]')
-    sec.locator('button[role=radio]:text-is("8")').tap(); pg.locator('.action-pos button').tap(); pg.wait_for_timeout(500); check('day-rest')
+    sec = pg.locator('section[aria-label="Paused Conventional Deadlift"]')
+    sec.locator('input[aria-label$="세트 중량"]').first.fill('100'); sec.locator('button[role=radio]:text-is("8")').first.tap(); pg.locator('.action-pos button').tap(); pg.wait_for_timeout(500); check('day-rest')
     try:
-        pg.wait_for_timeout(600); pg.locator('section[aria-label="Conventional Deadlift"] button[aria-label$="메뉴"]').click(timeout=5000); check('menu')
+        pg.wait_for_timeout(600); pg.locator('section[aria-label="Paused Conventional Deadlift"] button[aria-label$="메뉴"]').click(timeout=5000); check('menu')
         pg.mouse.click(195, 30); pg.wait_for_timeout(400)
     except Exception as e:
         errs.append('menu step: ' + str(e)[:80])
     pg.locator('button[aria-label="다음 날"]').tap(); check('restday')
     for name, key in [('캘린더', 'calendar'), ('ARM', 'arm')]:
         pg.tap(f'nav >> text={name}'); check(key)
-    for label, key in [('프로그램', 'program'), ('운동 기록', 'history'), ('분석', 'analysis'), ('모델 실험실', 'lab'), ('설정', 'settings')]:
+    for label, key in [('프로그램', 'program'), ('운동 라이브러리', 'library'), ('운동 기록', 'history'), ('분석', 'analysis'), ('모델 실험실', 'lab'), ('설정', 'settings')]:
         pg.tap('nav >> text=더보기'); pg.wait_for_timeout(250); pg.locator(f'text={label}').first.tap(); check(key)
     print(json.dumps({'theme': theme, 'errors': errs[:10], 'results': res}, ensure_ascii=False, indent=1))

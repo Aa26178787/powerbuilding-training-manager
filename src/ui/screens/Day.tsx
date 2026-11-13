@@ -15,6 +15,8 @@ import {
   setNextLoad, setSessionBodyweight, skipSets, startSession, unskipSet,
 } from '../../application/session';
 import { addPlannedSets, commitChange, previewChange, reorderInstance } from '../../application/schedule';
+import { assignSlot, duplicateWarnings, slotOptions, swapInstanceExercise } from '../../application/slots';
+import { EQUIPMENT_NAMES, slotById } from '../../domain/slots';
 import { armDayList, assignArmDay, fillArmMissing, videoCategoryFor } from '../../application/arm';
 import { ensureWeeksFor, haptic, run, toast, todayStr, useApp } from '../store';
 import { Badge, Btn, Chip, cx, fmtKg, PLATE_COLOR, Reveal, RpePicker, Sheet, Stepper } from '../components';
@@ -328,7 +330,7 @@ const PbTable = ({ db, g, date, focused, disabled, onEdit }: {
   useEffect(() => {
     setWeight(initW === null ? '' : String(initW)); setReps(String(initR)); setRpe(null); setFlags([]); setShowFlags(false); setReason(null); setCalib(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active?.id, sug?.load]);
+  }, [active?.id, sug?.load, g.exercise.id]);
   const w = weight === '' ? null : Number(weight);
   const plates = g.exercise.barbell && w !== null && w > 0 ? plateBreakdown(w, db.settings.barWeight, db.settings.plates, db.settings.plateStock) : null;
   const open = g.sets.filter((s) => s.status === 'planned');
@@ -577,6 +579,55 @@ const CardMenu = ({ db, g, date, disabled, isFirst, isLast, onEdit, onClose }: {
   );
 };
 
+/** 슬롯 운동 바꾸기: 세트·반복·RPE 처방은 그대로, 운동별 중량·진행은 따로 */
+const SwapSheet = ({ db, g, date, onClose }: { db: Db; g: DayGroupView; date: ISODate; onClose: () => void }) => {
+  const slotId = g.instance.slotId as string;
+  const slot = slotById(db, slotId);
+  const [pick, setPick] = useState<string | null>(null);
+  const [forward, setForward] = useState(true);
+  const started = g.sets.some((s) => s.status !== 'planned');
+  const opts = slotOptions(db, slotId);
+  const fav = new Set(db.settings.favorites ?? []);
+  const warn = pick ? duplicateWarnings(db, pick, date) : [];
+  const apply = async () => {
+    if (!pick) return;
+    const a = await run((d, ctx) => swapInstanceExercise(d, g.instance.id, pick, ctx));
+    if (!a.ok) return;
+    if (forward) { const b = await run((d, ctx) => assignSlot(d, slotId, pick, ctx, { fromDate: addDays(date, 1) })); if (!b.ok) return; }
+    toast(`${db.exercises[pick].name}(으)로 바꿨습니다${started ? '. 끝낸 세트는 원래 운동 기록으로 남습니다' : ''}`);
+    onClose();
+  };
+  return (
+    <Sheet title={`${slot?.name ?? '슬롯'} 운동 바꾸기`} onClose={onClose} footer={
+      <div className="space-y-2">
+        {warn.map((w) => <p key={w} className="text-[12.5px] leading-[1.45] text-p25">{w}</p>)}
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" className="h-5 w-5 accent-[var(--color-p15)]" checked={forward} onChange={(e) => setForward(e.target.checked)} />앞으로도 이 운동으로(이후 계획에도 적용)</label>
+        <Btn kind="primary" className="w-full" disabled={!pick} onClick={apply}>{pick ? `${db.exercises[pick].name}(으)로 바꾸기` : '운동을 고르세요'}</Btn>
+      </div>
+    }>
+      <p className="text-[12.5px] leading-[1.45] text-dust">처방({prescriptionText(g)})은 그대로입니다. 중량과 진행은 운동마다 따로 기록되며, 머신끼리 중량을 환산하지 않습니다.{started ? ' 끝낸 세트는 지금 운동 기록으로 남고 남은 세트만 바뀝니다.' : ''}</p>
+      <ul className="mt-2 divide-y divide-rail rounded-lg bg-deck">
+        {opts.map((e) => {
+          const last = summarize(lastSessionSets(db, e.id, date).filter((p) => p.plannedSetId !== null));
+          const cur = e.id === g.exercise.id;
+          return (
+            <li key={e.id}>
+              <button type="button" disabled={cur} aria-pressed={pick === e.id} onClick={() => setPick(e.id)} className={cx('flex min-h-[52px] w-full items-center gap-3 px-3 py-2 text-left', pick === e.id && 'bg-rail/60')}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold">{fav.has(e.id) ? '★ ' : ''}{e.name}</span>
+                  <span className="block truncate text-[12px] text-dust">{EQUIPMENT_NAMES[e.equipment ?? 'other']}{last ? <>, 지난번 <span className="num-d text-[13px] text-chalk/80">{last}</span></> : ', 기록 없음(처음엔 가벼운 세트로 시작 중량을 정합니다)'}</span>
+                </span>
+                {cur && <span className="text-[12px] text-dust">지금 운동</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <Btn className="mt-2 w-full" onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('ptm-nav', { detail: 'library' })); }}>라이브러리에서 운동 추가</Btn>
+    </Sheet>
+  );
+};
+
 const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, onFocus }: {
   db: Db; g: DayGroupView; date: ISODate; disabled: boolean; onEdit: (t: EditTarget) => void; isFirst: boolean; isLast: boolean; focused: boolean; onFocus: () => void;
 }) => {
@@ -594,6 +645,8 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
   const hasTags = !!(g.movedFrom || arm?.rom || (arm?.execution.length ?? 0) > 0 || arm?.loadNote || (arm && arm.sourceMissing.includes('intensity')) || arm?.userFilled);
   const showBody = g.sets.length > 0 && (focused || (started && !finished) || (finished && expand));
   const nextLine = finished && dec && dec.instanceId === g.instance.id && !arm ? `다음 세션 ${fmtKg(st.nextLoad)}kg. ${dec.reason}` : '';
+  const slot = !arm ? slotById(db, g.instance.slotId) : undefined;
+  const [swap, setSwap] = useState(false);
   const onHeader = focused ? undefined : finished ? () => setExpand(!expand) : onFocus;
 
   return (
@@ -607,7 +660,8 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
           </span>
         )}
         <button type="button" className={cx('min-h-11 min-w-0 flex-1 text-left', focused && 'cursor-default')} onClick={onHeader} aria-expanded={finished ? expand : focused}>
-          <h3 className={cx('truncate leading-tight', focused ? 'text-[20px] font-bold' : 'text-[15px] font-semibold')}>{g.instance.exerciseName}</h3>
+          <h3 className={cx('truncate leading-tight', focused ? 'text-[20px] font-bold' : 'text-[15px] font-semibold')}>{slot ? slot.name : g.instance.exerciseName}</h3>
+          {slot && <div className={cx('truncate text-[13px] leading-5', focused ? 'mt-0.5 text-chalk/85' : 'text-chalk/70')}>{g.exercise.name}</div>}
           {focused ? (
             <div className="mt-1 flex items-baseline gap-2 text-[13px] leading-5 text-dust"><span className="shrink-0 font-semibold text-chalk/75">{role.ko}</span><span className="num-d truncate text-[15px]">{prescriptionText(g)}</span></div>
           ) : finished ? (
@@ -621,6 +675,10 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
         <span className={cx('num-d shrink-0 leading-6 tabular-nums', focused ? 'text-[22px]' : 'text-[17px] text-dust', finished && 'text-chalk')}>{doneCount}<span className="text-knurl">/{g.sets.length}</span></span>
         <button type="button" className="press -mt-2.5 -mr-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-dust" onClick={() => setMenu(true)} aria-label={`${g.instance.exerciseName} 메뉴`}><Ellipsis size={20} aria-hidden /></button>
       </div>
+      {focused && slot && g.sets.some((s) => s.status === 'planned') && (
+        <div className="mt-2"><Chip disabled={disabled} onClick={() => setSwap(true)}>운동 변경</Chip></div>
+      )}
+      {focused && g.exercise.pause && <div className="mt-2 text-[12.5px] text-dust">정지: {g.exercise.pause.position}, {g.exercise.pause.seconds}초</div>}
       {nextLine && !focused && <div className={cx('mt-1 truncate text-[12px] text-dust', 'pl-8')}>{nextLine}</div>}
       {focused && hasTags && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -648,6 +706,7 @@ const GroupCard = ({ db, g, date, disabled, onEdit, isFirst, isLast, focused, on
             : <PbTable db={db} g={g} date={date} focused={focused} disabled={disabled} onEdit={onEdit} />}
         </Reveal>
       )}
+      {swap && slot && <SwapSheet db={db} g={g} date={date} onClose={() => setSwap(false)} />}
       {menu && <CardMenu db={db} g={g} date={date} disabled={disabled} isFirst={isFirst} isLast={isLast} onEdit={onEdit} onClose={() => setMenu(false)} />}
     </section>
   );

@@ -46,7 +46,7 @@ export const HomeScreen = ({ go }: { go: (tab: string, date?: ISODate) => void }
 
   const meet = db.settings.meetDate === undefined ? '2026-11-29' : db.settings.meetDate;
   const dday = meet && meet >= today ? Math.round((new Date(`${meet}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86400000) : null;
-  const lifts = [['스쿼트', 'comp_squat'], ['벤치', 'comp_bench'], ['데드', 'comp_sumo']].map(([ko, id]) => ({ ko, v: latestE1rm(db, id) }));
+  const lifts = [['스쿼트', 'comp_squat'], ['벤치', 'comp_bench'], ['데드', 'conv_dl']].map(([ko, id]) => ({ ko, v: latestE1rm(db, id) }));
   const pbToday = todayGroups.filter((g) => g.instance.track === 'pb');
   const armToday = todayGroups.filter((g) => g.instance.track === 'arm');
   // 이번 주 하루별 세트(현재 계획 기준): 완료, 남음, 지난 계획 미확정
